@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/wait.h>
 #include <stdbool.h>
 
 
@@ -61,6 +62,8 @@ void pipe_cmd();
 //Run command and arg
 void run_command(char** ParsedLine, int Args);
 
+char invalid_arg[] = {'>','<','|','*','!', '`', '\'','\"'};
+
 //Will go through a list of commands with the structure of command and arg
 //Do something with the given commands
 void examine_command(char** ParsedLine, int Args, char* Prompt) {
@@ -70,6 +73,11 @@ void examine_command(char** ParsedLine, int Args, char* Prompt) {
 			printf("%sError: Invalid command\n", Prompt);
 			return;
 		}
+		if (chdir(ParsedLine[1]) == -1) {
+			printf("%sError: Invalid directory\n", Prompt);
+			return;
+		}
+		return;
 	}
 	if (!strcmp(ParsedLine[0], "jobs\n") || !strcmp(ParsedLine[0], "jobs")) {
 		if (Args > 1) {
@@ -91,35 +99,81 @@ void examine_command(char** ParsedLine, int Args, char* Prompt) {
 		}
 		exit(0);
 	}
-	//Checks to see if there are more than 2 arguments
-	if (Args >= 2) {
-		if (ParsedLine[1][0] == '<') {
-			if (Args < 3) {
-				printf("%sError: No Input File\n", Prompt);
+	//Run a simple command
+	//Check if command or argument contain any invalid arguments
+	for (int i = 0; i < Args; ++i) {
+		for (int j = 0; j < 8; ++j) {
+			if (*ParsedLine[i] == invalid_arg[j]) {
+				printf("%sError: Invalid command\n", Prompt);
 				return;
 			}
-			
 		}
 	}
+	//Otherwise execute command
+	int ChildID = fork();
+	if(ChildID == 0) {
+		//First Check Absolute path
+		if (ParsedLine[0][0] == '/') {
+			if(execv(ParsedLine[0], ParsedLine) == -1)
+				printf("%sError: Invalid Program or relative path\n", Prompt);
+			exit(0);
+		}
+		//Then check Relative path
+		if (ParsedLine[0][0] == '.' && ParsedLine[0][1] == '/') {
+			char PathRel[] = "./";
+			strcat(PathRel, ParsedLine[0]);
+			if (execv(PathRel, ParsedLine) == -1)
+				printf("%sError: Invalid Program\n", Prompt);
+			exit(0);
+		}
+		//Then check /bin and usr/bin
+		char PathBin[] ="/bin/";
+		strcat(PathBin, ParsedLine[0]);
+		if (execv(PathBin, ParsedLine) == -1) {
+			char PathUsr[] = "/usr/bin/";
+			strcat(PathUsr, ParsedLine[0]);
+			if (execv(PathUsr, ParsedLine) == -1) 
+				printf("%sError: Invalid Program\n", Prompt);
+		}
+		exit(0);
+	}
+	wait(NULL);
+
+
+	//Check the command and see if there are any <, or |, or <, or <<. If none, execute the command and all arguments
+	//for (int i = 0; i < Args; ++i) {
+	//	if (ParsedLine[i] == '<') {
+	//
+	//	}
+	//}
+	////Checks to see if there are more than 2 arguments
+	//if (Args >= 2) {
+	//	
+	//
+	//}
 	
 }
 
 //Get and parse command line
 //Each command is seperated by space
 char** parse_command(char* command, int CountOfSpaces) {
-	//Accounts for last space, or if there is only 1
-	CountOfSpaces++;
-	char** ParsedCommand = malloc((CountOfSpaces) * sizeof(char*));
+	char** ParsedCommand = malloc((CountOfSpaces+1) * sizeof(char*));
 	char* SingleCommand = strtok(command, " ");
 	int i = 0;
 	while (SingleCommand != NULL) {
-		ParsedCommand[i] = calloc((get_length(SingleCommand) + 1), sizeof(char*));
+		ParsedCommand[i] = calloc((get_length(SingleCommand)), sizeof(char*));
 		for (int j = 0; j < get_length(SingleCommand); ++j) {
 			ParsedCommand[i][j] = SingleCommand[j];
 		}
 		++i;
 		SingleCommand = strtok(NULL, " ");
 	}
+	ParsedCommand[CountOfSpaces] = '\0';
+	if (CountOfSpaces == 1) {
+		ParsedCommand[0][get_length(ParsedCommand[0])-1] = '\0';
+	}else
+		ParsedCommand[CountOfSpaces-1][get_length(ParsedCommand[CountOfSpaces-1])-1] = '\0';
+
 	return ParsedCommand;
 }
 void free_command(char** command, int CountOfSpaces) {
@@ -137,10 +191,10 @@ int main(int argc, const char* const* argv) {
 		perror("calloc failed");
 		exit(1);
 	}
-	make_dir(&CmdPrompt);
 	char Command[1001];
 	//Create a while loop that waits for exit and exits on command
 	while (1) {
+		make_dir(&CmdPrompt);
 		if (CmdPrompt != NULL)
 			printf("%s", CmdPrompt);
 		fgets(Command, 1001, stdin);
@@ -161,7 +215,7 @@ int main(int argc, const char* const* argv) {
 
 		char** cmdline = parse_command(Command, CountOfArgs);
 		examine_command(cmdline, CountOfArgs, CmdPrompt);
-
+		
 
 		//Free the cmdline
 		free_command(cmdline, CountOfArgs);
