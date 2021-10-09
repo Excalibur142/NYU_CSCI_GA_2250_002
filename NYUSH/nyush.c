@@ -4,9 +4,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <fcntl.h>
 #include <sys/wait.h>
 #include <stdbool.h>
-
+#include <sys/stat.h>
 
 //make variadic to close as many pointers as possible
 void close_shell(char* CloseVal) {
@@ -99,6 +100,111 @@ void examine_command(char** ParsedLine, int Args, char* Prompt) {
 		}
 		exit(0);
 	}
+
+	//Check the command and see if there are any <, or |, or <, or <<. If none, execute the command and all arguments
+	//Create a flag every time a pipe has been seen and the previous pipe to create a parsed char** of cmd arg between pipes
+	int Flag = 0;
+	_Bool ChangeFlag = true;
+	for (int i = 0; i < Args; ++i) {
+		
+		//Checks for < > or |
+		if (strstr(ParsedLine[i], "<") || strstr(ParsedLine[i], "|")) {
+			//Set flag as new starting point for handling pipe and <
+			//Handle redirecting input
+			if (strstr(ParsedLine[i], "<")) { //****************************************************************** FIX MULTIPLE INPUT REDIRECTS, CURRENTLY DOES ALL? PLUS COMMANDS IN BETWEEN?
+				ParsedLine[i] = NULL;
+				int pid = fork();
+				if (pid == 0) {
+					int fd0 = open(ParsedLine[i + 1], O_RDONLY);
+					if (fd0 == -1) {
+						printf("%sError: Cant open file in input direct\n", Prompt);
+						exit(-1);
+					}
+					fchmod(fd0, 0600);
+					dup2(fd0, STDIN_FILENO);
+					close(fd0);
+					if (execvp(ParsedLine[0], ParsedLine) == -1) {
+						printf("%sError: Invalid command\n", Prompt);
+						exit(-1);
+					}
+				}
+				else {
+					wait(NULL);
+				}
+			
+			}
+			//Handle Piping
+			else if (strstr(ParsedLine[i], "|")) { //************************************************FIX TO ONLY RUN 2ND PIPE UP TO 2ND COMMAND
+				ParsedLine[i] = NULL;
+				int pipefd[2];
+				int status =0;
+				pid_t p1, p2;
+				if (pipe(pipefd) == -1) {
+					printf("%sPipe Failed", Prompt);
+					return;
+				}
+				p1 = fork();
+				if (p1 == 0) {
+					dup2(pipefd[1], 1);
+					close(pipefd[0]);
+					execvp(ParsedLine[Flag], ParsedLine+Flag);
+					exit(-1);
+				}
+				p2 = fork();
+				if (p2 == 0) {
+					dup2(pipefd[0], 0);
+					close(pipefd[1]);
+					execvp(ParsedLine[i + 1], ParsedLine + i + 1);
+					exit(-1);
+				}
+				else {
+					wait(NULL);
+				}
+							
+			}
+			
+			if (ChangeFlag == true) {
+				Flag = i+1;
+				ChangeFlag = false;
+			}
+			else
+				ChangeFlag = false;
+			//Continue because i at this point is null -> go to next value to check
+			continue;
+		}
+
+		//Handle output redirect
+		if (strstr(ParsedLine[i], ">")) {
+			ParsedLine[i] = NULL;
+			int pid = fork();
+			if (pid == 0) {
+				//In child
+				int fd0;
+				if ((fd0 = open(ParsedLine[i + 1], O_WRONLY | O_CREAT | O_TRUNC)) == -1) {
+					printf("%sError: Cant open file in redirect\n", Prompt);
+					exit(-1);
+				}
+				fchmod(fd0, 0600);
+				dup2(fd0, STDOUT_FILENO);
+				close(fd0);
+				if (execvp(ParsedLine[0], ParsedLine) == -1) {
+					printf("%sError: Invalid command\n", Prompt);
+					exit(-1);
+				}
+			}
+			else {
+				//parent waits for redirect to complete
+				wait(NULL);
+			}
+
+			return;
+		}
+	}
+
+	if (Flag > 0)
+		return;
+
+
 	//Run a simple command
 	//Check if command or argument contain any invalid arguments
 	for (int i = 0; i < Args; ++i) {
@@ -138,20 +244,6 @@ void examine_command(char** ParsedLine, int Args, char* Prompt) {
 		exit(0);
 	}
 	wait(NULL);
-
-
-	//Check the command and see if there are any <, or |, or <, or <<. If none, execute the command and all arguments
-	//for (int i = 0; i < Args; ++i) {
-	//	if (ParsedLine[i] == '<') {
-	//
-	//	}
-	//}
-	////Checks to see if there are more than 2 arguments
-	//if (Args >= 2) {
-	//	
-	//
-	//}
-	
 }
 
 //Get and parse command line
