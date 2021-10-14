@@ -40,7 +40,7 @@ void make_dir(char **directory) {
 	char* DirName = get_current_dir_name();
 	//Check if DirName is empty, if so return error
 	if (DirName == NULL) {
-		fprintf(stderr, "Error: invalid command\n");
+		fprintf(stderr, "Error: invalid directory\n");
 		return;
 	}
 	int DirLength = get_length(DirName);
@@ -49,7 +49,7 @@ void make_dir(char **directory) {
 			int MemToAllocate = DirLength - i + 15;
 			*directory = (char *)realloc(*directory, MemToAllocate);
 			if (*directory == NULL) {
-				perror("realloc failed");
+				fprintf(stderr, "Error: realloc failed\n");
 				exit(1);
 			}
 			memset(&*directory[0], 0, sizeof(directory));
@@ -75,15 +75,15 @@ int redirect_output(char* FileToRedirect, _Bool ShouldAppend) {
 	}
 	//If file cant be opened or created, throw
 	if (fd1 == -1) {
-		fprintf(stderr, "Error: invalid command\n");
+		fprintf(stderr, "Error: invalid file\n");
 		return -1;
 	}
 	if (dup2(fd1, 1) == -1) {
-		fprintf(stderr, "Error: invalid command\n");
+		fprintf(stderr, "Error: invalid file\n");
 		return -1;
 	}
 	if (close(fd1) == -1) {
-		fprintf(stderr, "Error: invalid command\n");
+		fprintf(stderr, "Error: invalid file\n");
 		return-1;
 	}
 	return 0;
@@ -92,15 +92,15 @@ int redirect_input(char* FileToRedirect) {
 	int fd0 = open(FileToRedirect, O_RDONLY);
 	//If file doesnt exist or cant be opened, throw
 	if (fd0 == -1) {
-		fprintf(stderr, "Error: invalid command\n");
+		fprintf(stderr, "Error: invalid file\n");
 		return -1;
 	}
 	if(dup2(fd0, 0) == -1) {
-		fprintf(stderr, "Error: invalid command\n");
+		fprintf(stderr, "Error: invalid file\n");
 		return -1;
 	}
 	if (close(fd0) == -1) {
-		fprintf(stderr, "Error: invalid command\n");
+		fprintf(stderr, "Error: invalid file\n");
 		return -1;
 	}
 	return 0;
@@ -117,7 +117,7 @@ void examine_command(char** ParsedLine, int Args, char* Prompt, _Bool* Cont) {
 			return;
 		}
 		if (chdir(ParsedLine[1]) == -1) {
-			fprintf(stderr, "Error: invalid command\n");
+			fprintf(stderr, "Error: invalid directory\n");
 			return;
 		}
 		return;
@@ -169,7 +169,7 @@ void run_command(char** ParsedLine, char* Prompt, int Flag){
 		//First Check Absolute path
 		if (ParsedLine[Flag][0] == '/') {
 			if(execv(ParsedLine[Flag], ParsedLine+Flag) == -1)
-				fprintf(stderr, "Error: invalid command\n");
+				fprintf(stderr, "Error: invalid program\n");
 			exit(0);
 		}
 		//Then check Relative path
@@ -177,7 +177,7 @@ void run_command(char** ParsedLine, char* Prompt, int Flag){
 			char PathRel[] = "./";
 			strcat(PathRel, ParsedLine[Flag]);
 			if (execv(PathRel, ParsedLine+Flag) == -1)
-				fprintf(stderr, "Error: invalid command\n");
+				fprintf(stderr, "Error: invalid program\n");
 			exit(0);
 		}
 		//Then check /bin and usr/bin
@@ -187,15 +187,16 @@ void run_command(char** ParsedLine, char* Prompt, int Flag){
 			char PathUsr[] = "/usr/bin/";
 			strcat(PathUsr, ParsedLine[Flag]);
 			if (execv(PathUsr, ParsedLine+Flag) == -1) 
-				fprintf(stderr, "Error: invalid command\n");
+				fprintf(stderr, "Error: invalid program\n");
 		}
 		exit(0);
 	}
 	else {
 		waitpid(ChildID, NULL, 0);
+		//REFERENCE: https://stackoverflow.com/questions/8514735/what-is-special-about-dev-tty Explanation of /dev/tty and why its needed to give control back to terminal
+		redirect_input("/dev/tty");
+		redirect_output("/dev/tty", false);
 	}
-	redirect_input("/dev/tty");
-	redirect_output("/dev/tty", false);
 }
 //Pipe function
 void pipe_cmd(char** ParsedLine, char* Prompt, int Flag) {
@@ -234,7 +235,7 @@ char** parse_command(char* command, int* CountOfSpaces) {
 	while (SingleCommand != NULL) {
 		ParsedCommand[i] = calloc((get_length(SingleCommand)), sizeof(char*));
 		for (int j = 0; j < get_length(SingleCommand); ++j) {
-			ParsedCommand[i][j] = SingleCommand[j];
+			ParsedCommand[i][j] = SingleCommand[j]; //Possible null terminate each command?
 		}
 		++i;
 		SingleCommand = strtok(NULL, " ");
@@ -252,12 +253,17 @@ char** parse_command(char* command, int* CountOfSpaces) {
 void sig_handler(int temp) {
 	
 }
+//Add processes to a list and update that list
+//List will keep pid, and process name
+void add_process(pid_t id, char** Command) {
 
+}
 int main(int argc, const char* const* argv) {
-	signal(SIGINT, sig_handler);
-	signal(SIGQUIT, sig_handler);
-	signal(SIGTERM, sig_handler);
-	signal(SIGTSTP, sig_handler);
+	int gFlag = 0;
+	//signal(SIGINT, sig_handler);
+	//signal(SIGQUIT, sig_handler);
+	//signal(SIGTERM, sig_handler);
+	//signal(SIGTSTP, sig_handler);
 	//Create variable to store current directory in
 	//This way only get_dir() needs to be called if directory changes
 	char* CmdPrompt = calloc(10, sizeof(char*));
@@ -269,13 +275,22 @@ int main(int argc, const char* const* argv) {
 	//Create a while loop that waits for exit and exits on command
 
 	while (1) {
+		if (!isatty(STDIN_FILENO)) {
+			gFlag = 1;
+		}
+
 		make_dir(&CmdPrompt);
 		if (CmdPrompt != NULL)
 			printf("%s", CmdPrompt);
+
 		if (fgets(Command, 1000, stdin) == NULL) {
+			printf("\n");
 			exit(0);
+			fflush(stdout);
 		}
-		if (Command[0] == '\n') {
+		fflush(stdout);
+
+		if (Command[strlen(Command-1)] == '\n' || Command[strlen(Command - 1)] == '\0') {
 			//Ignore and prompt again
 			continue;
 		}
@@ -293,9 +308,9 @@ int main(int argc, const char* const* argv) {
 		}
 		//Accounts for last space, or if there is only 1
 		CountOfArgs++;
-
 		_Bool ShouldContinue = false;
 		char** cmdline = parse_command(Command, &CountOfArgs);
+		
 		examine_command(cmdline, CountOfArgs, CmdPrompt, &ShouldContinue);
 		//Go through entered command and check for pipes and redirects
 		int Flag = 0;
@@ -338,6 +353,12 @@ int main(int argc, const char* const* argv) {
 
 		//Free the cmdline
 		free_command(cmdline, CountOfArgs);
+
+
+		if (gFlag = 1) {
+			//printf("\n");
+			//exit(0);
+		}
 	}
 
 	//Should never get here because exit will take care of it
