@@ -12,8 +12,8 @@
 
 //make variadic to close as many pointers as possible
 void close_shell(char* CloseVal) {
-	free(CloseVal);
 	printf("\n");
+	free(CloseVal);
 }
 
 void free_command(char** command, int CountOfSpaces) {
@@ -34,7 +34,7 @@ int get_length(char* ToCount) {
 //Call when changes to directory are made!
 //Otherwise use global directory value
 
-void make_dir(char **directory) {
+void make_dir(char** directory) {
 	if (directory == NULL)
 		return;
 	char* DirName = get_current_dir_name();
@@ -47,7 +47,7 @@ void make_dir(char **directory) {
 	for (int i = (DirLength - 1); i >= 0; i--) {
 		if (DirName[i] == '/') {
 			int MemToAllocate = DirLength - i + 15;
-			*directory = (char *)realloc(*directory, MemToAllocate);
+			*directory = (char*)realloc(*directory, MemToAllocate);
 			if (*directory == NULL) {
 				fprintf(stderr, "Error: realloc failed\n");
 				exit(1);
@@ -95,7 +95,7 @@ int redirect_input(char* FileToRedirect) {
 		fprintf(stderr, "Error: invalid file\n");
 		return -1;
 	}
-	if(dup2(fd0, 0) == -1) {
+	if (dup2(fd0, 0) == -1) {
 		fprintf(stderr, "Error: invalid file\n");
 		return -1;
 	}
@@ -115,6 +115,12 @@ void examine_command(char** ParsedLine, int Args, char* Prompt, _Bool* Cont) {
 		if (Args == 1 || Args > 2) {
 			fprintf(stderr, "Error: invalid command\n");
 			return;
+		}
+		if (Args == 2) {
+			if (!strcmp(ParsedLine[1], "")) {
+				fprintf(stderr, "Error: invalid command\n");
+				return;
+			}
 		}
 		if (chdir(ParsedLine[1]) == -1) {
 			fprintf(stderr, "Error: invalid directory\n");
@@ -148,88 +154,46 @@ void examine_command(char** ParsedLine, int Args, char* Prompt, _Bool* Cont) {
 		exit(0);
 	}
 }
-char invalid_arg[] = {'>','<','|','*','!', '`', '\'','\"'};
+char invalid_arg[] = { '>','<','|','*','!', '`', '\'','\"' };
 
 //Run command and arg
 //Do something with the given commands
-void run_command(char** ParsedLine, char* Prompt, int Flag){
+void run_command(char** ParsedLine, int Flag, _Bool* ShouldContinue) {
 	//Run a simple command
-	////Check if command or argument contain any invalid arguments
-	//for (int i = 0; i < Args; ++i) {
-	//	for (int j = 0; j < 8; ++j) {
-	//		if (*ParsedLine[i] == invalid_arg[j]) {
-	//			printf("%sError: Invalid command\n", Prompt);
-	//			return;
-	//		}
-	//	}
-	//}
+	
 	//Otherwise execute command
-	int ChildID = fork();
-	if(ChildID == 0) {
-		//First Check Absolute path
-		if (ParsedLine[Flag][0] == '/') {
-			if(execv(ParsedLine[Flag], ParsedLine+Flag) == -1)
-				fprintf(stderr, "Error: invalid program\n");
-			exit(0);
-		}
-		//Then check Relative path
-		if (ParsedLine[0][0] == '.' && ParsedLine[0][1] == '/') {
-			char PathRel[] = "./";
-			strcat(PathRel, ParsedLine[Flag]);
-			if (execv(PathRel, ParsedLine+Flag) == -1)
-				fprintf(stderr, "Error: invalid program\n");
-			exit(0);
-		}
-		//Then check /bin and usr/bin
-		char PathBin[] ="/bin/";
-		strcat(PathBin, ParsedLine[Flag]);
-		if (execv(PathBin, ParsedLine+Flag) == -1) {
-			char PathUsr[] = "/usr/bin/";
-			strcat(PathUsr, ParsedLine[Flag]);
-			if (execv(PathUsr, ParsedLine+Flag) == -1) 
-				fprintf(stderr, "Error: invalid program\n");
-		}
-		exit(0);
+	//First Check Absolute path
+	if (ParsedLine[Flag][0] == '/') {
+		if (execv(ParsedLine[Flag], ParsedLine + Flag) == -1)
+			fprintf(stderr, "Error: invalid program\n");
+		exit(-1);
 	}
-	else {
-		waitpid(ChildID, NULL, 0);
-		//REFERENCE: https://stackoverflow.com/questions/8514735/what-is-special-about-dev-tty Explanation of /dev/tty and why its needed to give control back to terminal
-		redirect_input("/dev/tty");
-		redirect_output("/dev/tty", false);
+	//Then check Relative path
+	if (ParsedLine[0][0] == '.' && ParsedLine[0][1] == '/') {
+		char PathRel[] = "./";
+		strcat(PathRel, ParsedLine[Flag]);
+		if (execv(PathRel, ParsedLine + Flag) == -1)
+			fprintf(stderr, "Error: invalid program\n");
+		exit(-1);
 	}
-}
-//Pipe function
-void pipe_cmd(char** ParsedLine, char* Prompt, int Flag) {
-	int pipe_fd[2];
-	if (pipe(pipe_fd) == -1) {
-		fprintf(stderr, "Error: Cant create pip\n");
-		return;
+	//Then check /bin and usr/bin
+	char PathBin[] = "/bin/";
+	strcat(PathBin, ParsedLine[Flag]);
+	if (execv(PathBin, ParsedLine + Flag) == -1) {
+		char PathUsr[] = "/usr/bin/";
+		strcat(PathUsr, ParsedLine[Flag]);
+		if (execv(PathUsr, ParsedLine + Flag) == -1)
+			fprintf(stderr, "Error: invalid program\n");
 	}
-	if (dup2(pipe_fd[1], 1) == -1) {
-		fprintf(stderr, "Error: cant dup\n");
-		return;
-	}
-	if (close(pipe_fd[1]) == -1) {
-		fprintf(stderr, "Error: Cant close pipe\n");
-		return;
-	}
-	//Run the first command, the next command will either get pipe'd or ran as the final command
-	run_command(ParsedLine, Prompt, Flag);
-	if (dup2(pipe_fd[0], 0) == -1) {
-		fprintf(stderr, "Error: cant dup\n");
-		return;
-	}
-	if (close(pipe_fd[0]) == -1) {
-		fprintf(stderr, "Error: cant close pipe\n");
-		return;
-	}
+	exit(-1);
+
 }
 
 
 //Get and parse command line
 //Each command is seperated by space
 char** parse_command(char* command, int* CountOfSpaces) {
-	char** ParsedCommand = malloc((*CountOfSpaces+1) * sizeof(char*));
+	char** ParsedCommand = malloc((*CountOfSpaces + 1) * sizeof(char*));
 	char* SingleCommand = strtok(command, " ");
 	int i = 0;
 	while (SingleCommand != NULL) {
@@ -243,15 +207,16 @@ char** parse_command(char* command, int* CountOfSpaces) {
 	*CountOfSpaces = i;
 	ParsedCommand[*CountOfSpaces] = '\0';
 	if (*CountOfSpaces == 1) {
-		ParsedCommand[0][get_length(ParsedCommand[0])-1] = '\0';
-	}else
-		ParsedCommand[*CountOfSpaces-1][get_length(ParsedCommand[*CountOfSpaces-1])-1] = '\0';
+		ParsedCommand[0][get_length(ParsedCommand[0]) - 1] = '\0';
+	}
+	else
+		ParsedCommand[*CountOfSpaces - 1][get_length(ParsedCommand[*CountOfSpaces - 1]) - 1] = '\0';
 
 	return ParsedCommand;
 }
 //Signal Handling
 void sig_handler(int temp) {
-	
+
 }
 //Add processes to a list and update that list
 //List will keep pid, and process name
@@ -275,92 +240,219 @@ int main(int argc, const char* const* argv) {
 	//Create a while loop that waits for exit and exits on command
 
 	while (1) {
-		if (!isatty(STDIN_FILENO)) {
-			gFlag = 1;
-		}
-
-		make_dir(&CmdPrompt);
+				make_dir(&CmdPrompt);
 		if (CmdPrompt != NULL)
 			printf("%s", CmdPrompt);
 
 		if (fgets(Command, 1000, stdin) == NULL) {
 			printf("\n");
 			exit(0);
-			fflush(stdout);
 		}
 		fflush(stdout);
 
-		if (Command[strlen(Command-1)] == '\n' || Command[strlen(Command - 1)] == '\0') {
+		if (Command[strlen(Command - 1)] == '\n' || Command[strlen(Command - 1)] == '\0') {
 			//Ignore and prompt again
 			continue;
 		}
 		//Check command length and prompt for new one
 		if (strlen(Command) > 1000) {
-			printf("%sError: Your command was over 1000 characters\n",CmdPrompt);
+			printf("%sError: Your command was over 1000 characters\n", CmdPrompt);
 			fflush(stdin);
 			continue;
 		}
 		//Get count of arguments
 		int CountOfArgs = 0;
+		int CountOfPipes = 0;
 		for (int i = 0; i < get_length(Command); ++i) {
 			if (Command[i] == ' ')
 				CountOfArgs++;
+			if (Command[i] == '|')
+				CountOfPipes++;
 		}
 		//Accounts for last space, or if there is only 1
 		CountOfArgs++;
 		_Bool ShouldContinue = false;
 		char** cmdline = parse_command(Command, &CountOfArgs);
-		
+
 		examine_command(cmdline, CountOfArgs, CmdPrompt, &ShouldContinue);
 		//Go through entered command and check for pipes and redirects
-		int Flag = 0;
-		_Bool ChangeFlag = true;
+
+		//Check for error in command
+		int CountOfInputR;
 		for (int i = 0; i < CountOfArgs; ++i) {
-			if (strstr(cmdline[i], "<")) {
-				if (redirect_input(cmdline[i + 1]) == -1) {
-					ShouldContinue = true;
-					break;
-				}
-				cmdline[i] = NULL;
-				pipe_cmd(cmdline, CmdPrompt, Flag);
-			}
-			else if (strstr(cmdline[i], ">")) {
-				if (strstr(cmdline[i], ">>")) {
-					if (redirect_output(cmdline[i + 1], true) == -1) {
+			if (!strcmp(cmdline[i], "<")) { //will catch first input redirect
+				if (cmdline[i + 2] != NULL) {
+					if (strcmp(cmdline[i + 2], "|") != 0) {
+						fprintf(stderr, "Error: invalid command\n");
 						ShouldContinue = true;
 						break;
 					}
 				}
-				else if (redirect_output(cmdline[i + 1], false) == -1) {
+			}
+			if (strstr(cmdline[i], "<<")) {
+				ShouldContinue = true;
+				fprintf(stderr, "Error: invalid command\n");
+				break;
+			}
+			if (!strcmp(cmdline[i], "|")) {
+				if (i == 0) {
+					fprintf(stderr, "Error: invalid command\n");
 					ShouldContinue = true;
 					break;
 				}
-				cmdline[i] = NULL;
-			}
-			else if (strstr(cmdline[i], "|")) {
-				//Found pipe, set flag 1 to location after operation so next command executes after pipe
-				cmdline[i] = NULL;
-				pipe_cmd(cmdline, CmdPrompt,Flag);
-				Flag = i + 1;
+				if (cmdline[i - 1] != NULL) {
+					if (!strcmp(cmdline[i - 1], "")) {
+						fprintf(stderr, "Error: invalid command\n");
+						ShouldContinue = true;
+						break;
+					}
+				}
+				if (cmdline[i + 1] != NULL) {
+					if (!strcmp(cmdline[i + 1], "")) {
+						fprintf(stderr, "Error: invalid command\n");
+						ShouldContinue = true;
+						break;
+					}
+				}
 			}
 		}
+
+
 		if (ShouldContinue == true) {
-			ShouldContinue = false;
 			continue;
 		}
-		run_command(cmdline, CmdPrompt,Flag);
+
+		//Find pipes and store index of pipe
+		int** indexOfPipes = calloc(CountOfPipes, sizeof(int));
+		int k = 0;
+		for (int i = 0; i < CountOfArgs; ++i) {
+			if (!strcmp(cmdline[i], "|")) {
+				indexOfPipes[k] = calloc(4, sizeof(int));
+				*indexOfPipes[k] = i;
+				//Set the pipe to null now
+				cmdline[i] = NULL;
+				k++;
+			}
+		}
+
+		//Check for redirect if count of pipes is 0 and > is present.
+		//Set Output redirect flag to true! and then check if no pipes are present after running first input redirect
+		//Otherwise check for output redirect as final command only if flag is present
+		int indexOfOut;
+		//for (int i = 0; i < CountOfArgs; ++i) {
+		//	if (cmdline[1] == NULL)
+		//		continue;
+		//	if (!strcmp(cmdline[i], ">")) { //will catch final out
+		//		if(cmdline[i+1] != NULL)
+		//			indexOfOut = i+1; //setting position and status of output flag
+		//		//fprintf(stderr, "Got to index of out count flag, where index of file is: %i and index of > is:%i \n", indexOfOut, i);
+		//
+		//		cmdline[i] = NULL;
+		//	}
+		//}
+		
+		int Flag = 0;
+
+		//Create a number of pipes
+
+		int pipes[CountOfPipes][2];
+		int i;
+		for (i = 0; i < CountOfPipes; ++i) {
+			pipe(pipes[i]);
+		}
+		//If no pipes, run command normally, if pipes, fork multiple times
+		for (i = 0; i < CountOfPipes + 1; ++i) {
+			if (ShouldContinue == true)
+				break;
+			int pid = fork();
+			if (pid == 0) {
+				//Child occurs whether there is a pipe or not!
+				if (i == 0) {
+					dup2(pipes[i][1], STDOUT_FILENO);
+					if (CountOfPipes > 0) { // If command is first and there are multiple pipes present, check for redirect
+						for (int k = 0; k < *indexOfPipes[0]; ++k) {//Shouldnt have to worry about the pipe being null because it only searches up until the first pipe. Any other < is incorrect
+							if (!strcmp(cmdline[k], "<")) {
+								cmdline[k] = NULL;
+								int fd0 = open(cmdline[k + 1], O_RDONLY);
+								if (fd0 == -1) {
+									fprintf(stderr, "Error: invalid file\n");
+									ShouldContinue = true;
+								}
+								dup2(fd0, STDIN_FILENO);
+								close(fd0);
+							}
+						}
+						cmdline[*indexOfPipes[0]] = NULL;
+					}
+					else if (CountOfPipes == 0) {// Again, shouldnt have to worry about any | being null because there are none
+						for (int k = 0; k < CountOfArgs; ++k) {
+							if (!strcmp(cmdline[k], "<")) {
+								cmdline[k] = NULL;
+								int fd0 = open(cmdline[k + 1], O_RDONLY);
+								if (fd0 == -1) {
+									fprintf(stderr, "Error: invalid file\n");
+									ShouldContinue = true;
+								}
+								dup2(fd0, STDIN_FILENO);
+								close(fd0);
+							}
+						}
+						//if (indexOfOut > 0) {
+						//	fprintf(stderr, "Got to index of out\n");
+						//	int fd1 = open(cmdline[indexOfOut], O_WRONLY | O_TRUNC | O_CREAT, 0600);
+						//	if (fd1 == -1) {
+						//		fprintf(stderr, "Error: invalid file\n");
+						//		return -1;
+						//	}
+						//	dup2(fd1, STDOUT_FILENO);
+						//	close(fd1);
+						//	indexOfOut = 0;
+						//}
+					}
+				}
+				else if (i == CountOfPipes) {
+					dup2(pipes[i - 1][0], STDIN_FILENO);
+					Flag = *indexOfPipes[i - 1] + 1; //Take the last index of pipe for the second argument
+					cmdline[i] = NULL;
+				}
+				else {
+					dup2(pipes[i - 1][0], STDIN_FILENO);
+					dup2(pipes[i][1], STDOUT_FILENO);
+					Flag = *indexOfPipes[i - 1] + 1; //Take the first index of pipe for the second argument
+					cmdline[i] = NULL;
+				}
+				int j;
+				for (j = 0; j < CountOfPipes; ++j) {
+					close(pipes[j][0]);
+					close(pipes[j][1]);
+				}
+				if (ShouldContinue == true)
+					exit(-1);
+				run_command(cmdline, Flag, &ShouldContinue);
+				//exit on failure handled in run command
+			}
+		}
+
+		for (i = 0; i < CountOfPipes; ++i) {
+			close(pipes[i][0]);
+			close(pipes[i][1]);
+		}
+
+		for (int i = 0; i < CountOfPipes + 1; ++i) {
+			wait(NULL);
+		}
 
 
 		//Free the cmdline
 		free_command(cmdline, CountOfArgs);
+		//Free index of pipes counter
+		for (int i = 0; i < CountOfPipes; ++i)
+			free(indexOfPipes[i]);
+		free(indexOfPipes);
 
-
-		if (gFlag = 1) {
-			//printf("\n");
-			//exit(0);
-		}
 	}
 
 	//Should never get here because exit will take care of it
+	printf("\n");
 	close_shell(CmdPrompt);
 }
