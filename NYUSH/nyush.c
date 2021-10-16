@@ -12,7 +12,6 @@
 
 //make variadic to close as many pointers as possible
 void close_shell(char* CloseVal) {
-	printf("\n");
 	free(CloseVal);
 }
 
@@ -64,49 +63,6 @@ void make_dir(char** directory) {
 	free(DirName);
 }
 
-//Redirect Functions
-int redirect_output(char* FileToRedirect, _Bool ShouldAppend) {
-	int fd1;
-	if (ShouldAppend) {
-		fd1 = open(FileToRedirect, O_WRONLY | O_APPEND, 0600);
-	}
-	else {
-		fd1 = open(FileToRedirect, O_WRONLY | O_TRUNC | O_CREAT, 0600);
-	}
-	//If file cant be opened or created, throw
-	if (fd1 == -1) {
-		fprintf(stderr, "Error: invalid file\n");
-		return -1;
-	}
-	if (dup2(fd1, 1) == -1) {
-		fprintf(stderr, "Error: invalid file\n");
-		return -1;
-	}
-	if (close(fd1) == -1) {
-		fprintf(stderr, "Error: invalid file\n");
-		return-1;
-	}
-	return 0;
-}
-int redirect_input(char* FileToRedirect) {
-	int fd0 = open(FileToRedirect, O_RDONLY);
-	//If file doesnt exist or cant be opened, throw
-	if (fd0 == -1) {
-		fprintf(stderr, "Error: invalid file\n");
-		return -1;
-	}
-	if (dup2(fd0, 0) == -1) {
-		fprintf(stderr, "Error: invalid file\n");
-		return -1;
-	}
-	if (close(fd0) == -1) {
-		fprintf(stderr, "Error: invalid file\n");
-		return -1;
-	}
-	return 0;
-}
-
-
 //Will go through a list of commands with the structure of command and arg
 void examine_command(char** ParsedLine, int Args, char* Prompt, _Bool* Cont) {
 	//Handle 4 simple commands
@@ -154,6 +110,7 @@ void examine_command(char** ParsedLine, int Args, char* Prompt, _Bool* Cont) {
 		exit(0);
 	}
 }
+
 char invalid_arg[] = { '>','<','|','*','!', '`', '\'','\"' };
 
 //Run command and arg
@@ -186,9 +143,7 @@ void run_command(char** ParsedLine, int Flag, _Bool* ShouldContinue) {
 			fprintf(stderr, "Error: invalid program\n");
 	}
 	exit(-1);
-
 }
-
 
 //Get and parse command line
 //Each command is seperated by space
@@ -282,7 +237,7 @@ int main(int argc, const char* const* argv) {
 		for (int i = 0; i < CountOfArgs; ++i) {
 			if (!strcmp(cmdline[i], "<")) { //will catch first input redirect
 				if (cmdline[i + 2] != NULL) {
-					if (strcmp(cmdline[i + 2], "|") != 0) {
+					if (strcmp(cmdline[i + 2], "|") != 0 && strstr(cmdline[i + 2], ">") == 0) {
 						fprintf(stderr, "Error: invalid command\n");
 						ShouldContinue = true;
 						break;
@@ -316,12 +271,9 @@ int main(int argc, const char* const* argv) {
 				}
 			}
 		}
-
-
 		if (ShouldContinue == true) {
 			continue;
 		}
-
 		//Find pipes and store index of pipe
 		int** indexOfPipes = calloc(CountOfPipes, sizeof(int));
 		int k = 0;
@@ -334,27 +286,9 @@ int main(int argc, const char* const* argv) {
 				k++;
 			}
 		}
-
-		//Check for redirect if count of pipes is 0 and > is present.
-		//Set Output redirect flag to true! and then check if no pipes are present after running first input redirect
-		//Otherwise check for output redirect as final command only if flag is present
-		int indexOfOut;
-		//for (int i = 0; i < CountOfArgs; ++i) {
-		//	if (cmdline[1] == NULL)
-		//		continue;
-		//	if (!strcmp(cmdline[i], ">")) { //will catch final out
-		//		if(cmdline[i+1] != NULL)
-		//			indexOfOut = i+1; //setting position and status of output flag
-		//		//fprintf(stderr, "Got to index of out count flag, where index of file is: %i and index of > is:%i \n", indexOfOut, i);
-		//
-		//		cmdline[i] = NULL;
-		//	}
-		//}
+		int Flag = 0; //Will be used to move command along the 2d array
 		
-		int Flag = 0;
-
 		//Create a number of pipes
-
 		int pipes[CountOfPipes][2];
 		int i;
 		for (i = 0; i < CountOfPipes; ++i) {
@@ -397,29 +331,64 @@ int main(int argc, const char* const* argv) {
 								close(fd0);
 							}
 						}
-						//if (indexOfOut > 0) {
-						//	fprintf(stderr, "Got to index of out\n");
-						//	int fd1 = open(cmdline[indexOfOut], O_WRONLY | O_TRUNC | O_CREAT, 0600);
-						//	if (fd1 == -1) {
-						//		fprintf(stderr, "Error: invalid file\n");
-						//		return -1;
-						//	}
-						//	dup2(fd1, STDOUT_FILENO);
-						//	close(fd1);
-						//	indexOfOut = 0;
-						//}
+						for (int i = 0; i < CountOfArgs; ++i) {// Again, shouldnt have to worry about any | being null because there are none
+							if (cmdline[i] == NULL)
+								continue;
+							if (strstr(cmdline[i], ">")) { //will catch final out
+								if (cmdline[i + 1] != NULL) {
+									int fd1;
+									if (strstr(cmdline[i], ">>")) { // Append
+										fd1 = open(cmdline[i + 1], O_WRONLY | O_APPEND, 0600);
+									}
+									else {
+										fd1 = open(cmdline[i+1], O_WRONLY | O_TRUNC | O_CREAT, 0600);
+									}
+									cmdline[i] = NULL;
+									if (fd1 == -1) {
+										ShouldContinue = true;
+										fprintf(stderr, "Error: invalid file\n");
+										return -1;
+									}
+									dup2(fd1, STDOUT_FILENO);
+									close(fd1);			
+								}
+							}
+						}
 					}
 				}
 				else if (i == CountOfPipes) {
 					dup2(pipes[i - 1][0], STDIN_FILENO);
 					Flag = *indexOfPipes[i - 1] + 1; //Take the last index of pipe for the second argument
-					cmdline[i] = NULL;
+					cmdline[*indexOfPipes[i-1]] = NULL;
+					for (int k=i; k < CountOfArgs-i+1; ++k) {// Check for output redirect if it is the final command at end of pipe
+						if (cmdline[k] == NULL)
+							continue;
+						if (strstr(cmdline[k], ">")) { //will catch final out
+							if (cmdline[k + 1] != NULL) {
+								int fd0;
+								if (strstr(cmdline[k], ">>")) { //append
+									fd0 = open(cmdline[k + 1], O_WRONLY | O_APPEND, 0600);
+								}
+								else {
+									fd0 = open(cmdline[k + 1], O_WRONLY | O_TRUNC | O_CREAT, 0600);
+								}
+								cmdline[k] = NULL;
+								if (fd0 == -1) {
+									ShouldContinue = true;
+									fprintf(stderr, "Error: invalid file\n");
+									return -1;
+								}
+								dup2(fd0, STDOUT_FILENO);
+								close(fd0);
+							}
+						}
+					}
 				}
 				else {
 					dup2(pipes[i - 1][0], STDIN_FILENO);
 					dup2(pipes[i][1], STDOUT_FILENO);
 					Flag = *indexOfPipes[i - 1] + 1; //Take the first index of pipe for the second argument
-					cmdline[i] = NULL;
+					cmdline[*indexOfPipes[i - 1]] = NULL;
 				}
 				int j;
 				for (j = 0; j < CountOfPipes; ++j) {
