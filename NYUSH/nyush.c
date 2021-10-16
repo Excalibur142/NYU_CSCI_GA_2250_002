@@ -63,6 +63,58 @@ void make_dir(char** directory) {
 	free(DirName);
 }
 
+struct process {
+	int processID;
+	char* ProcessCommand;
+};
+struct process ProcessList[100];
+//make a pid list that has no more than 100 processes
+int pidList[100][1];
+char pidCommand[100][1000];
+//Signal Handling
+void sig_handler(int temp) {
+	//IMPLEMENT FOR ALL PIDS NOT NULL
+	for (int i = 0; i < 100; ++i) {
+		if (pidList[i][0] > 0) {
+			fprintf(stderr, "%i Process Killed\n", pidList[0][0]);
+			kill(pidList[i][0], SIGKILL);
+			kill(getpid(), SIGCONT);
+		}
+		else
+			break;
+	}
+	kill(getpid(), SIGCONT);
+
+}
+void sig_stop(int temp) {
+	//IMPLEMENT FOR ALL PIDS NOT NULL
+	for (int i = 0; i < 100; ++i) {
+		if (pidList[i][0]){
+			fprintf(stderr, "%i Process Paused\n", pidList[0][0]);
+			//Add process id and commmand to processlist struct
+				//Get next available slot
+			for (int j = 0; j < 100; ++j) {
+				if (!ProcessList[j].processID) {
+					ProcessList[j].processID = pidList[i][0];
+					if (ProcessList[j].ProcessCommand == NULL)
+						ProcessList[j].ProcessCommand = calloc(1000, sizeof(char));
+					for (int k = 0; k < 1000; k++) {
+						if (pidCommand[i][k] == '\n') {
+							ProcessList[j].ProcessCommand[k] = '\0';
+							break; //Break after last command is entered
+						}
+						ProcessList[j].ProcessCommand[k] = pidCommand[i][k];
+					}
+					break; //Break after first available process id struct is found
+				}
+			}
+			kill(pidList[i][0], SIGTSTP);
+			kill(getpid(), SIGCONT);
+		}
+		else
+			break;
+	}
+}
 //Will go through a list of commands with the structure of command and arg
 void examine_command(char** ParsedLine, int Args, char* Prompt, _Bool* Cont) {
 	//Handle 4 simple commands
@@ -90,6 +142,13 @@ void examine_command(char** ParsedLine, int Args, char* Prompt, _Bool* Cont) {
 			fprintf(stderr, "Error: invalid command\n");
 			return;
 		}
+		for (int i = 0; i < 100; ++i) {
+			if (ProcessList[i].processID) {
+				printf("[%i] [%s]\n", i+1, ProcessList[i].ProcessCommand);
+			}
+			else
+				break;
+		}
 	}
 	if (!strcmp(ParsedLine[0], "fg\n") || !strcmp(ParsedLine[0], "fg")) {
 		*Cont = true;
@@ -97,6 +156,13 @@ void examine_command(char** ParsedLine, int Args, char* Prompt, _Bool* Cont) {
 			fprintf(stderr, "Error: invalid command\n");
 			return;
 		}
+		int id = *ParsedLine[1]-49;
+		if (!ProcessList[id].processID) {
+			fprintf(stderr, "Error: invalid job\n");
+			return;
+		}
+		kill(ProcessList[id].processID, SIGCONT);
+		kill(getpid(), SIGTSTP);
 	}
 	if (!strcmp(ParsedLine[0], "exit\n") || !strcmp(ParsedLine[0], "exit")) {
 		//Handle suspended jobs
@@ -106,6 +172,13 @@ void examine_command(char** ParsedLine, int Args, char* Prompt, _Bool* Cont) {
 			return;
 		}
 		free_command(ParsedLine, Args);
+		for (int i = 0; i < 100; ++i) {
+			if (ProcessList[i].processID) {
+				free(ProcessList[i].ProcessCommand);
+			}
+			else
+				break;
+		}
 		close_shell(Prompt);
 		exit(0);
 	}
@@ -169,10 +242,6 @@ char** parse_command(char* command, int* CountOfSpaces) {
 
 	return ParsedCommand;
 }
-//Signal Handling
-void sig_handler(int temp) {
-
-}
 //Add processes to a list and update that list
 //List will keep pid, and process name
 void add_process(pid_t id, char** Command) {
@@ -180,30 +249,34 @@ void add_process(pid_t id, char** Command) {
 }
 int main(int argc, const char* const* argv) {
 	int gFlag = 0;
-	//signal(SIGINT, sig_handler);
-	//signal(SIGQUIT, sig_handler);
-	//signal(SIGTERM, sig_handler);
-	//signal(SIGTSTP, sig_handler);
+	signal(SIGINT, sig_handler);
+	signal(SIGQUIT, sig_handler);
+	signal(SIGTERM, sig_handler);
+	signal(SIGTSTP, sig_stop);
 	//Create variable to store current directory in
-	//This way only get_dir() needs to be called if directory changes
 	char* CmdPrompt = calloc(10, sizeof(char*));
 	if (CmdPrompt == NULL) {
 		fprintf(stderr, "Error: calloc failed\n");
 		exit(1);
 	}
 	char Command[1001];
+	//Create array of ints that can store pid
+	char** StoppedProcess;
 	//Create a while loop that waits for exit and exits on command
-
 	while (1) {
-				make_dir(&CmdPrompt);
+		//Clear pidlist array
+		for (int i = 0; i < 100; ++i) {
+			pidList[i][0] = 0;
+		}
+		make_dir(&CmdPrompt);
 		if (CmdPrompt != NULL)
 			printf("%s", CmdPrompt);
 
+		fflush(stdout);
 		if (fgets(Command, 1000, stdin) == NULL) {
 			printf("\n");
 			exit(0);
 		}
-		fflush(stdout);
 
 		if (Command[strlen(Command - 1)] == '\n' || Command[strlen(Command - 1)] == '\0') {
 			//Ignore and prompt again
@@ -288,6 +361,7 @@ int main(int argc, const char* const* argv) {
 		}
 		int Flag = 0; //Will be used to move command along the 2d array
 		
+
 		//Create a number of pipes
 		int pipes[CountOfPipes][2];
 		int i;
@@ -299,6 +373,11 @@ int main(int argc, const char* const* argv) {
 			if (ShouldContinue == true)
 				break;
 			int pid = fork();
+			pidList[i][0] = pid;
+			for (int j = 0; j < get_length(Command); ++j) {
+				pidCommand[i][j] = Command[j];
+			}
+			
 			if (pid == 0) {
 				//Child occurs whether there is a pipe or not!
 				if (i == 0) {
@@ -406,9 +485,10 @@ int main(int argc, const char* const* argv) {
 			close(pipes[i][0]);
 			close(pipes[i][1]);
 		}
-
+		
 		for (int i = 0; i < CountOfPipes + 1; ++i) {
-			wait(NULL);
+			//wait(NULL);
+			waitpid(pidList[i][0], NULL, WUNTRACED);
 		}
 
 
