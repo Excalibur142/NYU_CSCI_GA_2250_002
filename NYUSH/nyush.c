@@ -64,10 +64,10 @@ void make_dir(char** directory) {
 }
 
 struct process {
-	int processID;
-	char* ProcessCommand;
+	int processID; //Will hold all of the process ids of a single command so cat | ls would hold process ids for both
+	char* ProcessCommand; //Will hold entire command 
 };
-struct process ProcessList[100];
+struct process ProcessList[100]; //You can suspend up to 100 commands at a time 
 //make a pid list that has no more than 100 processes
 int pidList[100][1];
 char pidCommand[100][1000];
@@ -76,7 +76,7 @@ void sig_handler(int temp) {
 	//IMPLEMENT FOR ALL PIDS NOT NULL
 	for (int i = 0; i < 100; ++i) {
 		if (pidList[i][0] > 0) {
-			fprintf(stderr, "%i Process Killed\n", pidList[0][0]);
+			fprintf(stderr, "%i Process Killed\n", pidList[i][0]);
 			kill(pidList[i][0], SIGKILL);
 			kill(getpid(), SIGCONT);
 		}
@@ -90,7 +90,7 @@ void sig_stop(int temp) {
 	//IMPLEMENT FOR ALL PIDS NOT NULL
 	for (int i = 0; i < 100; ++i) {
 		if (pidList[i][0]){
-			fprintf(stderr, "%i Process Paused\n", pidList[0][0]);
+			fprintf(stderr, "%i Process Paused\n", pidList[i][0]);
 			//Add process id and commmand to processlist struct
 				//Get next available slot
 			for (int j = 0; j < 100; ++j) {
@@ -260,8 +260,7 @@ int main(int argc, const char* const* argv) {
 		exit(1);
 	}
 	char Command[1001];
-	//Create array of ints that can store pid
-	char** StoppedProcess;
+	
 	//Create a while loop that waits for exit and exits on command
 	while (1) {
 		//Clear pidlist array
@@ -277,7 +276,7 @@ int main(int argc, const char* const* argv) {
 			printf("\n");
 			exit(0);
 		}
-
+		
 		if (Command[strlen(Command - 1)] == '\n' || Command[strlen(Command - 1)] == '\0') {
 			//Ignore and prompt again
 			continue;
@@ -300,8 +299,11 @@ int main(int argc, const char* const* argv) {
 		//Accounts for last space, or if there is only 1
 		CountOfArgs++;
 		_Bool ShouldContinue = false;
-		char** cmdline = parse_command(Command, &CountOfArgs);
-
+		char* tmpCommand;
+		tmpCommand = malloc(1000 * sizeof(char));
+		strncpy(tmpCommand, Command, 1000);
+		char** cmdline = parse_command(tmpCommand, &CountOfArgs);
+		free(tmpCommand);
 		examine_command(cmdline, CountOfArgs, CmdPrompt, &ShouldContinue);
 		//Go through entered command and check for pipes and redirects
 
@@ -376,6 +378,7 @@ int main(int argc, const char* const* argv) {
 			pidList[i][0] = pid;
 			for (int j = 0; j < get_length(Command); ++j) {
 				pidCommand[i][j] = Command[j];
+				//printf("Command: %s\n", Command);
 			}
 			
 			if (pid == 0) {
