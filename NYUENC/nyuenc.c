@@ -6,25 +6,27 @@
 #include <sys/mman.h>
 #include <fcntl.h>
 #include <sys/stat.h>
+#include <sys/queue.h>
+#include <pthread.h>
+#include <time.h>
+#include <stdbool.h>
 
 #define ARR_SIZE 2147483648
-
 //Use getopt to see if -j jobs were added, if so read argv of files from after jobs, if not just read argv of jobs
-
+//offset needs to be subtracted from one if greater than zero?
 void encode_File(off_t FileSize, char* file, int* offset, char *arr) {
-	unsigned char count;
+	unsigned char count = 0;
 	char letter;
 	int j = 0;
 	for (int i = *offset; i < FileSize+*offset; ++i) {
 		if (!file[i])
 			break;
-		letter = file[i];
+		arr[j] = file[i];
 		count++;
 		while (file[i] == file[i + 1]) {
 			count++;
 			i++;
 		}
-		arr[j] = file[i];
 		arr[j + 1] = count;
 		j+=2;
 		//printf("%c%c", file[i], count);
@@ -33,11 +35,31 @@ void encode_File(off_t FileSize, char* file, int* offset, char *arr) {
 	return;
 }
 
+
+typedef struct Task {
+	char* file; //file to read from
+	int fileOffset; //where to read from
+	int chunkSize; //how much to read (could be determined by offset)
+	char* arr; //where to store the information
+} Task;
+
+pthread_mutex_t jobMutex;
+pthread_cond_t jobCondition;
+
+_Bool shouldContinue = true;
+
+void* funcStart(void* args) {
+	while (shouldContinue) {
+		Task task;
+	}
+}
+
+
 int main(int argc, char* const* argv) {
 	//read through argv
 	int optIndex;
-	int threadCount;
-	int chunkSize = 4000;
+	int threadCount = 1; //Default to one thread
+	int chunkSize = 4000; //ASK ABOUT IF ITS 4096
 	int fileOffset = 0;
 	//int arrOffset = 0;
 	char* encode = malloc(ARR_SIZE);
@@ -48,9 +70,19 @@ int main(int argc, char* const* argv) {
 		case 'j':
 			//sscanf(optarg, "%d", &threadCount);
 			threadCount = atol(optarg);
-			printf("Jobs used, amount is: %d\n", threadCount);
+			//printf("Jobs used, amount is: %d\n", threadCount);
 		default:
 			break;
+		}
+	}
+	//Creating threads
+	pthread_t* threadPool = malloc(threadCount * sizeof(pthread_t));
+	pthread_mutex_init(&jobMutex, NULL);
+	pthread_cond_init(&jobCondition, NULL);
+	for (int i = 0; i < threadCount; i++) {
+		if (pthread_create(&threadPool[i], NULL, &funcStart, NULL) != 0) {
+			perror("Could not create thread pool");
+			exit(1);
 		}
 	}
 	//loop through commands and open files accordingly
@@ -58,7 +90,7 @@ int main(int argc, char* const* argv) {
 		//each file is argv[optind]
 		int fd = open(argv[optind], O_RDONLY); //Open file to read
 		if (fd < 0) {
-			perror("File open failed\n"); //error checking
+			fprintf(stderr,"File open failed on: %s \n", argv[optind]); //error checking
 			exit(1);
 		}
 		//Get file length information
@@ -72,7 +104,7 @@ int main(int argc, char* const* argv) {
 		}
 		close(fd); //close opened file now that it is in memory
 		//Encode file now.
-		char tempArr[8000];
+		char tempArr[8000]; //ASK ABOUT 8192
 		encode_File(chunkSize, fileToRead, &fileOffset, tempArr);
 		
 		//fileOffset = fileInfo.st_size;
@@ -82,15 +114,29 @@ int main(int argc, char* const* argv) {
 		}
 		strcat(encode, tempArr);
 	}
-	
+
+	//Stop all running threads
+	shouldContinue = false;
+	//Destroying threads and mutex
+	for (int i = 0; i < threadCount; i++) {
+		if (pthread_join(threadPool[i], NULL) != 0) {
+			perror("Could not join thread");
+			exit(1);
+		}
+	}
+	pthread_mutex_destroy(&jobMutex);
+	pthread_cond_destroy(&jobCondition);
+
+	//Print resulting encoded file
 	for (int i = 0; i < ARR_SIZE; ++i) {
 		if (encode[i]) {
 			if (encode[i + 3]) {
-				if (encode[i] == encode[i + 2]) {
-					printf("%c%c", encode[i], encode[i + 1] + encode[i + 3]);
-					i += 3;
-				}
-				else
+				//Concatenate ending and beginning of chunks/files
+				//if (encode[i] == encode[i + 2]) {
+				//	printf("%c%c", encode[i], encode[i + 1] + encode[i + 3]);
+				//	i += 3;
+				//}
+				//else
 					printf("%c", encode[i]);
 			}
 			else
