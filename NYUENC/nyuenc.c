@@ -18,7 +18,7 @@ void encode_File(off_t FileSize, char* file, int* offset, char *arr) {
 	unsigned char count = 0;
 	char letter;
 	int j = 0;
-	for (int i = *offset; i < FileSize+*offset; ++i) {
+	for (int i = *offset; i < FileSize; ++i) {
 		if (!file[i])
 			break;
 		arr[j] = file[i];
@@ -26,6 +26,8 @@ void encode_File(off_t FileSize, char* file, int* offset, char *arr) {
 		while (file[i] == file[i + 1]) {
 			count++;
 			i++;
+			if (i >= FileSize)
+				break;
 		}
 		arr[j + 1] = count;
 		j+=2;
@@ -41,6 +43,7 @@ typedef struct Task {
 	int fileOffset; //where to read from
 	int chunkSize; //how much to read (could be determined by offset)
 	char* arr; //where to store the information
+	struct stat fileInfo;
 } Task;
 
 pthread_mutex_t jobMutex;
@@ -59,7 +62,7 @@ int main(int argc, char* const* argv) {
 	//read through argv
 	int optIndex;
 	int threadCount = 1; //Default to one thread
-	int chunkSize = 4000; //ASK ABOUT IF ITS 4096
+	off_t chunkSize = 4000; //ASK ABOUT IF ITS 4096
 	int fileOffset = 0;
 	//int arrOffset = 0;
 	char* encode = malloc(ARR_SIZE);
@@ -85,7 +88,16 @@ int main(int argc, char* const* argv) {
 			exit(1);
 		}
 	}
+	//Find out how many files there are
+	int fileCount = argc;
+	//for (; optind < argc; optind++) {
+	//	++fileCount;
+	//}
+	//optind = 1;//Reset option index
+	char** fileArr = malloc(fileCount);
+	off_t* fileSizes = malloc(fileCount);
 	//loop through commands and open files accordingly
+	int i = 0;
 	for (; optind < argc; optind++) {
 		//each file is argv[optind]
 		int fd = open(argv[optind], O_RDONLY); //Open file to read
@@ -97,22 +109,36 @@ int main(int argc, char* const* argv) {
 		//REFERENCE -> https://linuxhint.com/using_mmap_function_linux/ Idea for using fstat
 		struct stat fileInfo;
 		fstat(fd, &fileInfo);
-		char* fileToRead = mmap(NULL, fileInfo.st_size, PROT_READ, MAP_SHARED, fd, 0);
-		if (fileToRead == MAP_FAILED) {
+		fileSizes[i] = fileInfo.st_size;
+		fileArr[i] = mmap(NULL, fileSizes[i], PROT_READ, MAP_SHARED, fd, 0);
+		if (fileArr[i] == MAP_FAILED) {
 			perror("Map failed to open file in virtual memory\n"); //error checking
 			exit(1);
 		}
 		close(fd); //close opened file now that it is in memory
+
+		//Divide file into chunks and submit to task queue
+
+		++i;
+	}
+
+	for (int i = 0; i < fileCount; ++i) {
+		if (fileArr[i] == NULL)
+			break;
 		//Encode file now.
 		char tempArr[8000]; //ASK ABOUT 8192
-		encode_File(chunkSize, fileToRead, &fileOffset, tempArr);
-		
+		encode_File(chunkSize, fileArr[i], &fileOffset, tempArr);
 		//fileOffset = fileInfo.st_size;
-		if (munmap(fileToRead, fileInfo.st_size) != 0) {
+		strcat(encode, tempArr);
+	}
+
+	for (int i = 0; i < fileCount; ++i) {
+		if (fileArr[i] == NULL)
+			break;
+		if (munmap(fileArr[i], fileSizes[i]) != 0) {
 			perror("Error unmapping file\n");
 			exit(1);
 		}
-		strcat(encode, tempArr);
 	}
 
 	//Stop all running threads
@@ -124,9 +150,11 @@ int main(int argc, char* const* argv) {
 			exit(1);
 		}
 	}
+	
+	free(fileArr);
+	free(fileSizes);
 	pthread_mutex_destroy(&jobMutex);
 	pthread_cond_destroy(&jobCondition);
-
 	//Print resulting encoded file
 	for (int i = 0; i < ARR_SIZE; ++i) {
 		if (encode[i]) {
