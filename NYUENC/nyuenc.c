@@ -12,13 +12,14 @@
 #include <stdbool.h>
 
 #define ARR_SIZE 2147483648
+#define TASKSAVAILABLE 256
 //Use getopt to see if -j jobs were added, if so read argv of files from after jobs, if not just read argv of jobs
 //offset needs to be subtracted from one if greater than zero?
-void encode_File(off_t FileSize, char* file, int* offset, char *arr) {
+void encode_File(off_t FileSize, char* file, int offset, char *arr) {
 	unsigned char count = 0;
 	char letter;
 	int j = 0;
-	for (int i = *offset; i < FileSize; ++i) {
+	for (int i = offset; i < FileSize; ++i) {
 		if (!file[i])
 			break;
 		arr[j] = file[i];
@@ -40,17 +41,24 @@ void encode_File(off_t FileSize, char* file, int* offset, char *arr) {
 
 typedef struct Task {
 	char* file; //file to read from
-	int fileOffset; //where to read from
+	int fileOff; //where to read from
 	int chunkSize; //how much to read (could be determined by offset)
 	char* arr; //where to store the information
-	struct stat fileInfo;
+	struct stat fileInf;
 } Task;
+
+Task taskQueue[TASKSAVAILABLE];
+int taskCount = 0;
 
 pthread_mutex_t jobMutex;
 pthread_cond_t jobCondition;
 
 _Bool shouldContinue = true;
-
+void addTask(Task task) {
+	pthread_mutex_lock(&jobMutex);
+	taskQueue[taskCount++] = task;
+	pthread_mutex_unlock(&jobMutex);
+}
 void* funcStart(void* args) {
 	while (shouldContinue) {
 		Task task;
@@ -66,6 +74,7 @@ int main(int argc, char* const* argv) {
 	int fileOffset = 0;
 	//int arrOffset = 0;
 	char* encode = malloc(ARR_SIZE);
+	char TempArr[TASKSAVAILABLE][8000];
 	//Get amount of threads to create and store in variable
 	while ((optIndex = getopt(argc, argv, ":j:")) != -1) {
 		switch (optIndex)
@@ -118,19 +127,55 @@ int main(int argc, char* const* argv) {
 		close(fd); //close opened file now that it is in memory
 
 		//Divide file into chunks and submit to task queue
-
+		int tempSize = fileInfo.st_size;
+		while (true) {
+			if (tempSize - chunkSize > 0) {
+				//printf("Tempsize is: %i\n", tempSize);
+				Task temp = {
+					.file = fileArr[i],
+					.fileOff = fileOffset,
+					.arr = TempArr[i],
+					.fileInf = fileInfo
+				};
+				fileOffset += chunkSize;
+				addTask(temp);
+				tempSize -= chunkSize;
+			}
+			else {
+				//printf("Tempsize is: %i\n", tempSize);
+				//fileOffset += chunkSize;
+				Task temp = {
+					.file = fileArr[i],
+					.fileOff = fileOffset,
+					.arr = TempArr[i],
+					.fileInf = fileInfo
+				};
+				addTask(temp);
+				break;
+			}
+		}
+		fileOffset = 0;
 		++i;
 	}
 
-	for (int i = 0; i < fileCount; ++i) {
-		if (fileArr[i] == NULL)
-			break;
-		//Encode file now.
-		char tempArr[8000]; //ASK ABOUT 8192
-		encode_File(chunkSize, fileArr[i], &fileOffset, tempArr);
-		//fileOffset = fileInfo.st_size;
-		strcat(encode, tempArr);
+	//Go through task queue
+	for (int i = 0; i < taskCount; ++i) {
+		//if (taskQueue[i].fileOff) {
+		//printf("File offset is: %i\n", taskQueue[i].fileOff);
+			encode_File(chunkSize, taskQueue[i].file, taskQueue[i].fileOff, taskQueue[i].arr);
+			strcat(encode, taskQueue[i].arr);
+		//}
 	}
+
+	//for (int i = 0; i < fileCount; ++i) {
+	//	if (fileArr[i] == NULL)
+	//		break;
+	//	//Encode file now.
+	//	char tempArr[8000]; //ASK ABOUT 8192
+	//	encode_File(chunkSize, fileArr[i], &fileOffset, tempArr);
+	//	//fileOffset = fileInfo.st_size;
+	//	strcat(encode, tempArr);
+	//}
 
 	for (int i = 0; i < fileCount; ++i) {
 		if (fileArr[i] == NULL)
