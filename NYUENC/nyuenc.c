@@ -1,6 +1,7 @@
 #include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
 #include <string.h>
 #include <unistd.h>
 #include <sys/mman.h>
@@ -12,6 +13,7 @@
 #include <stdbool.h>
 
 #define ARR_SIZE 2147483648
+#define CHUNK_SIZE 4000
 #define TASKSAVAILABLE 256
 //Use getopt to see if -j jobs were added, if so read argv of files from after jobs, if not just read argv of jobs
 //offset needs to be subtracted from one if greater than zero?
@@ -19,7 +21,7 @@ void encode_File(off_t FileSize, char* file, int offset, char *arr) {
 	unsigned char count = 0;
 	char letter;
 	int j = 0;
-	for (int i = offset; i < FileSize; ++i) {
+	for (int i = offset; i < offset+CHUNK_SIZE; ++i) {
 		if (!file[i])
 			break;
 		arr[j] = file[i];
@@ -65,16 +67,25 @@ void* funcStart(void* args) {
 	}
 }
 
-
+void failOnExit(char** arr) {
+	int i = 0;
+	while (arr[i] != NULL) {
+		free(arr[i]);
+		++i;
+	}
+	free(arr);
+	exit(1);
+}
 int main(int argc, char* const* argv) {
 	//read through argv
 	int optIndex;
 	int threadCount = 1; //Default to one thread
-	off_t chunkSize = 4000; //ASK ABOUT IF ITS 4096
+	off_t chunkSize = CHUNK_SIZE; //ASK ABOUT IF ITS 4096
 	int fileOffset = 0;
+	int countOfChunks = 0;
 	//int arrOffset = 0;
-	char* encode = malloc(ARR_SIZE);
-	char TempArr[TASKSAVAILABLE][8000];
+	//char* encode = malloc(ARR_SIZE);
+	char** TempArr = malloc(250000); //MAKE SURE TO FREE LATER!
 	//Get amount of threads to create and store in variable
 	while ((optIndex = getopt(argc, argv, ":j:")) != -1) {
 		switch (optIndex)
@@ -94,15 +105,11 @@ int main(int argc, char* const* argv) {
 	for (int i = 0; i < threadCount; i++) {
 		if (pthread_create(&threadPool[i], NULL, &funcStart, NULL) != 0) {
 			perror("Could not create thread pool");
-			exit(1);
+			failOnExit(TempArr);
 		}
 	}
 	//Find out how many files there are
 	int fileCount = argc;
-	//for (; optind < argc; optind++) {
-	//	++fileCount;
-	//}
-	//optind = 1;//Reset option index
 	char** fileArr = malloc(fileCount);
 	off_t* fileSizes = malloc(fileCount);
 	//loop through commands and open files accordingly
@@ -112,7 +119,7 @@ int main(int argc, char* const* argv) {
 		int fd = open(argv[optind], O_RDONLY); //Open file to read
 		if (fd < 0) {
 			fprintf(stderr,"File open failed on: %s \n", argv[optind]); //error checking
-			exit(1);
+			failOnExit(TempArr);
 		}
 		//Get file length information
 		//REFERENCE -> https://linuxhint.com/using_mmap_function_linux/ Idea for using fstat
@@ -122,19 +129,21 @@ int main(int argc, char* const* argv) {
 		fileArr[i] = mmap(NULL, fileSizes[i], PROT_READ, MAP_SHARED, fd, 0);
 		if (fileArr[i] == MAP_FAILED) {
 			perror("Map failed to open file in virtual memory\n"); //error checking
-			exit(1);
+			failOnExit(TempArr);
 		}
 		close(fd); //close opened file now that it is in memory
 
 		//Divide file into chunks and submit to task queue
 		int tempSize = fileInfo.st_size;
 		while (true) {
+			TempArr[countOfChunks] = malloc(8000);
 			if (tempSize - chunkSize > 0) {
 				//printf("Tempsize is: %i\n", tempSize);
+				//printf("Count of chunks is: %i\n", countOfChunks);
 				Task temp = {
 					.file = fileArr[i],
 					.fileOff = fileOffset,
-					.arr = TempArr[i],
+					.arr = TempArr[countOfChunks++],
 					.fileInf = fileInfo
 				};
 				fileOffset += chunkSize;
@@ -144,10 +153,11 @@ int main(int argc, char* const* argv) {
 			else {
 				//printf("Tempsize is: %i\n", tempSize);
 				//fileOffset += chunkSize;
+				//printf("Count of chunks is: %i\n", countOfChunks);
 				Task temp = {
 					.file = fileArr[i],
 					.fileOff = fileOffset,
-					.arr = TempArr[i],
+					.arr = TempArr[countOfChunks++],
 					.fileInf = fileInfo
 				};
 				addTask(temp);
@@ -157,32 +167,23 @@ int main(int argc, char* const* argv) {
 		fileOffset = 0;
 		++i;
 	}
-
 	//Go through task queue
 	for (int i = 0; i < taskCount; ++i) {
 		//if (taskQueue[i].fileOff) {
 		//printf("File offset is: %i\n", taskQueue[i].fileOff);
-			encode_File(chunkSize, taskQueue[i].file, taskQueue[i].fileOff, taskQueue[i].arr);
-			strcat(encode, taskQueue[i].arr);
+			encode_File(taskQueue[i].fileInf.st_size, taskQueue[i].file, taskQueue[i].fileOff, taskQueue[i].arr);
+			//strcat(encode, taskQueue[i].arr);
 		//}
 	}
-
-	//for (int i = 0; i < fileCount; ++i) {
-	//	if (fileArr[i] == NULL)
-	//		break;
-	//	//Encode file now.
-	//	char tempArr[8000]; //ASK ABOUT 8192
-	//	encode_File(chunkSize, fileArr[i], &fileOffset, tempArr);
-	//	//fileOffset = fileInfo.st_size;
-	//	strcat(encode, tempArr);
+	//for (int i = 0; i < taskCount; ++i) {
+	//	fprintf(stderr, "File size: %i\nFile offset:%i\nTempor Array: %s\nActual array: %s\n", taskQueue[i].fileInf.st_size, taskQueue[i].fileOff, taskQueue[i].arr, TempArr[i]);
 	//}
-
 	for (int i = 0; i < fileCount; ++i) {
 		if (fileArr[i] == NULL)
 			break;
 		if (munmap(fileArr[i], fileSizes[i]) != 0) {
-			perror("Error unmapping file\n");
-			exit(1);
+			fprintf(stderr, "Error unmapping file: %c\n", fileArr[i]);
+			failOnExit(TempArr);
 		}
 	}
 
@@ -192,7 +193,7 @@ int main(int argc, char* const* argv) {
 	for (int i = 0; i < threadCount; i++) {
 		if (pthread_join(threadPool[i], NULL) != 0) {
 			perror("Could not join thread");
-			exit(1);
+			failOnExit(TempArr);
 		}
 	}
 	
@@ -200,24 +201,37 @@ int main(int argc, char* const* argv) {
 	free(fileSizes);
 	pthread_mutex_destroy(&jobMutex);
 	pthread_cond_destroy(&jobCondition);
-	//Print resulting encoded file
-	for (int i = 0; i < ARR_SIZE; ++i) {
-		if (encode[i]) {
-			if (encode[i + 3]) {
-				//Concatenate ending and beginning of chunks/files
-				//if (encode[i] == encode[i + 2]) {
-				//	printf("%c%c", encode[i], encode[i + 1] + encode[i + 3]);
-				//	i += 3;
-				//}
-				//else
-					printf("%c", encode[i]);
-			}
-			else
-				printf("%c", encode[i]);
+	for (int i = 0; i < TASKSAVAILABLE; ++i) {
+		if (TempArr[i] != NULL) {
+			printf("%s", TempArr[i]);
 		}
 		else
 			break;
 	}
-	free(encode);
+	//Print resulting encoded file
+	//for (int i = 0; i < ARR_SIZE; ++i) {
+	//	if (encode[i]) {
+	//		if (encode[i + 3]) {
+	//			//Concatenate ending and beginning of chunks/files
+	//			//if (encode[i] == encode[i + 2]) {
+	//			//	printf("%c%c", encode[i], encode[i + 1] + encode[i + 3]);
+	//			//	i += 3;
+	//			//}
+	//			//else
+	//				printf("%c", encode[i]);
+	//		}
+	//		else
+	//			printf("%c", encode[i]);
+	//	}
+	//	else
+	//		break;
+	//}
+	//free(encode);
+	i = 0;
+	while (TempArr[i] != NULL) {
+		free(TempArr[i]);
+		++i;
+	}
+	free(TempArr);
 	return 0;
 }
