@@ -14,7 +14,7 @@
 
 #define ARR_SIZE 2147483648
 #define CHUNK_SIZE 4000
-#define TASKSAVAILABLE 256
+#define TASKSAVAILABLE 250000
 //Use getopt to see if -j jobs were added, if so read argv of files from after jobs, if not just read argv of jobs
 //offset needs to be subtracted from one if greater than zero?
 void encode_File(off_t FileSize, char* file, int offset, char *arr) {
@@ -47,7 +47,10 @@ typedef struct Task {
 	int chunkSize; //how much to read (could be determined by offset)
 	char* arr; //where to store the information
 	struct stat fileInf;
+	//LIST_ENTRY(Task) entries;
 } Task;
+
+//LIST_HEAD(listhead, Task);
 
 Task taskQueue[TASKSAVAILABLE];
 int taskCount = 0;
@@ -60,10 +63,26 @@ void addTask(Task task) {
 	pthread_mutex_lock(&jobMutex);
 	taskQueue[taskCount++] = task;
 	pthread_mutex_unlock(&jobMutex);
+	pthread_cond_signal(&jobCondition);
 }
 void* funcStart(void* args) {
 	while (shouldContinue) {
 		Task task;
+		pthread_mutex_lock(&jobMutex);
+		while (taskCount == 0) {
+			pthread_cond_wait(&jobCondition, &jobMutex);
+		}
+
+		task = taskQueue[0];
+		int i;
+		for (i = 0; i < taskCount - 1; i++) {
+			taskQueue[i] = taskQueue[i + 1];
+		}
+		taskCount--;
+		pthread_mutex_unlock(&jobMutex);
+		//fprintf(stderr, "File size: %i\nFile offset:%i\nTempor Array: %s\n", task.fileInf.st_size, task.fileOff, task.arr);
+		//task.arr[0] = 'h';
+		encode_File(task.fileInf.st_size, task.file, task.fileOff, task.arr);
 	}
 }
 
@@ -77,6 +96,8 @@ void failOnExit(char** arr) {
 	exit(1);
 }
 int main(int argc, char* const* argv) {
+	//struct listhead head;
+	//LIST_INIT(&head);
 	//read through argv
 	int optIndex;
 	int threadCount = 1; //Default to one thread
@@ -168,16 +189,21 @@ int main(int argc, char* const* argv) {
 		++i;
 	}
 	//Go through task queue
-	for (int i = 0; i < taskCount; ++i) {
-		//if (taskQueue[i].fileOff) {
-		//printf("File offset is: %i\n", taskQueue[i].fileOff);
-			encode_File(taskQueue[i].fileInf.st_size, taskQueue[i].file, taskQueue[i].fileOff, taskQueue[i].arr);
-			//strcat(encode, taskQueue[i].arr);
-		//}
-	}
+	//for (int i = 0; i < taskCount; ++i) {
+	//	//if (taskQueue[i].fileOff) {
+	//	//printf("File offset is: %i\n", taskQueue[i].fileOff);
+	//		encode_File(taskQueue[i].fileInf.st_size, taskQueue[i].file, taskQueue[i].fileOff, taskQueue[i].arr);
+	//		//strcat(encode, taskQueue[i].arr);
+	//	//}
+	//}
 	//for (int i = 0; i < taskCount; ++i) {
 	//	fprintf(stderr, "File size: %i\nFile offset:%i\nTempor Array: %s\nActual array: %s\n", taskQueue[i].fileInf.st_size, taskQueue[i].fileOff, taskQueue[i].arr, TempArr[i]);
 	//}
+
+	//Stop all running threads
+	while (taskCount != 0){}
+	shouldContinue = false;
+	fprintf(stderr, "test\n");
 	for (int i = 0; i < fileCount; ++i) {
 		if (fileArr[i] == NULL)
 			break;
@@ -186,9 +212,6 @@ int main(int argc, char* const* argv) {
 			failOnExit(TempArr);
 		}
 	}
-
-	//Stop all running threads
-	shouldContinue = false;
 	//Destroying threads and mutex
 	for (int i = 0; i < threadCount; i++) {
 		if (pthread_join(threadPool[i], NULL) != 0) {
