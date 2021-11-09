@@ -13,8 +13,8 @@
 #include <stdbool.h>
 #include <semaphore.h>
 
-#define ARR_SIZE 2147483648
-#define CHUNK_SIZE 4096
+//#define ARR_SIZE 2147483648
+#define CHUNK_SIZE 8000000000
 #define TASKSAVAILABLE 2500000
 //Use getopt to see if -j jobs were added, if so read argv of files from after jobs, if not just read argv of jobs
 //offset needs to be subtracted from one if greater than zero?
@@ -30,10 +30,11 @@ void encode_File(off_t FileSize, char* file, int offset, char *arr) {
 		while (file[i] == file[i + 1]) {
 			count++;
 			i++;
-			if (i >= offset+CHUNK_SIZE-1)
+			if (i >= offset+CHUNK_SIZE -1)
 				break;
 		}
 		arr[j + 1] = count;
+		
 		j+=2;
 		//printf("%c%c", file[i], count);
 		count = 0;
@@ -62,6 +63,7 @@ int threadsStillRunning = 0;
 
 pthread_mutex_t jobMutex;
 pthread_cond_t jobCondition;
+_Bool lastThread = false;
 
 _Bool shouldContinue = true;
 void addTask(Task task) {
@@ -72,27 +74,42 @@ void addTask(Task task) {
 }
 void* funcStart(void* args) {
 	while (shouldContinue) {
+		//fprintf(stderr, "task running\n");
 		Task task;
 		pthread_mutex_lock(&jobMutex);
-		while (taskCount == 0) {
-			pthread_cond_wait(&jobCondition, &jobMutex);
-		}
+		//fprintf(stderr, "task running but with mutex\n");
 
-		task = taskQueue[0];
-		int i;
-		for (i = 0; i < taskCount - 1; i++) {
-			taskQueue[i] = taskQueue[i + 1];
+		if (taskCount == 0) {
+			pthread_cond_wait(&jobCondition, &jobMutex);
+			//fprintf(stderr, "task paused on job wait\n");
 		}
-		taskCount--;
-		pthread_mutex_unlock(&jobMutex);
-		//fprintf(stderr, "File size: %i\nFile offset:%i\n", task.fileInf.st_size, task.fileOff);
-		encode_File(task.fileInf.st_size, task.file, task.fileOff, task.arr);
+		if (taskQueue[0].file != NULL) {
+			task = taskQueue[0];
+			int i;
+			for (i = 0; i < taskCount - 1; i++) {
+				taskQueue[i] = taskQueue[i + 1];
+			}
+			taskCount--;
+			pthread_mutex_unlock(&jobMutex);
+			//fprintf(stderr, "File size: %i\nFile offset:%i\n", task.fileInf.st_size, task.fileOff);
+			encode_File(task.fileInf.st_size, task.file, task.fileOff, task.arr);
+
+		}
 	}
+	//fprintf(stderr, "Trying to grab mutex\n");
 	pthread_mutex_lock(&counting);
 	threadsStillRunning--;
+	if (threadsStillRunning == 0) {
+		lastThread = true;
+	}
 	pthread_mutex_unlock(&counting);
-	if(threadsStillRunning == 0)
-		pthread_cond_signal(&countSignal);
+	//fprintf(stderr, "Released Thread Mutex\n");
+	//if (threadsStillRunning == 0) {
+	//	pthread_cond_signal(&countSignal);
+	//	fprintf(stderr, "Last Thread\n");
+	//
+	//}
+
 }
 
 void failOnExit(char** arr) {
@@ -166,6 +183,7 @@ int main(int argc, char* const* argv) {
 
 		//Divide file into chunks and submit to task queue
 		int tempSize = fileInfo.st_size;
+		
 		while (true) {
 			TempArr[countOfChunks] = malloc(chunkSize *2);
 			if (tempSize - chunkSize > 0) {
@@ -190,16 +208,23 @@ int main(int argc, char* const* argv) {
 				break;
 			}
 		}
-		//fprintf(stderr, "Made it to 193\n");
 		fileOffset = 0;
 		++i;
 	}
 
+	
 	//Stop all running threads
 	while (taskCount != 0){}
 	shouldContinue = false;
-	pthread_cond_wait(&countSignal, &counting);
-	//fprintf(stderr, "test\n");
+	pthread_cond_broadcast(&jobCondition);
+	//fprintf(stderr, "Broadcast sent\n");
+
+	while (threadsStillRunning > 0) { pthread_cond_broadcast(&jobCondition); }//fprintf(stderr, "threads running: %i\n", threadsStillRunning); }
+	//fprintf(stderr, "tasks completed\n");
+	while (!lastThread) {}
+	//pthread_cond_wait(&countSignal, &counting);
+	//fprintf(stderr, "Past main wait\n");
+
 	//implement a semaphore here where each thread ups it and downs only when leaving. 
 	for (int i = 0; i < fileCount; ++i) {
 		if (fileArr[i] == NULL)
@@ -210,8 +235,10 @@ int main(int argc, char* const* argv) {
 			failOnExit(TempArr);
 		}
 	}
+	//fprintf(stderr, "threadcount is: %i\n", threadCount);
 	//Destroying threads and mutex
 	for (int i = 0; i < threadCount; i++) {
+		//fprintf(stderr, "threadcount is: %i\n", threadCount);
 		if (pthread_join(threadPool[i], NULL) != 0) {
 			perror("Could not join thread");
 			failOnExit(TempArr);
@@ -242,8 +269,10 @@ int main(int argc, char* const* argv) {
 			break; //break if no more left to print
 		for (int j = 0 + printOffset; j < chunkSize * 2; ++j) {
 			if (TempArr[i][j] != 0) {
-				if(TempArr[i][j+2])
+				if (TempArr[i][j + 2]) {
 					printf("%c", TempArr[i][j]);
+					fflush(stdout);
+				}
 				else
 				{
 					//last element char and count
@@ -252,11 +281,14 @@ int main(int argc, char* const* argv) {
 						if (TempArr[i][j] == TempArr[i + 1][0]) {
 							printf("%c%c", TempArr[i][j], TempArr[i][j + 1] + TempArr[i + 1][1]);
 							setOffset = true;
+							fflush(stdout);
+	
 							break;
 						}
 					}
 					//next element does not exist, print both char and count
 					printf("%c%c", TempArr[i][j], TempArr[i][j + 1]);
+					fflush(stdout);
 					break;
 					
 				}
