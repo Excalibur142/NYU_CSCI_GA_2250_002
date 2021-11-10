@@ -14,11 +14,11 @@
 #include <semaphore.h>
 
 //#define ARR_SIZE 2147483648
-#define CHUNK_SIZE 8000000000
+#define CHUNK_SIZE 4000
 #define TASKSAVAILABLE 2500000
 //Use getopt to see if -j jobs were added, if so read argv of files from after jobs, if not just read argv of jobs
 //offset needs to be subtracted from one if greater than zero?
-void encode_File(off_t FileSize, char* file, int offset, char *arr) {
+void encode_File(int FileSize, char* file, int offset, char *arr) {
 	unsigned char count = 0;
 	char letter;
 	int j = 0;
@@ -27,11 +27,15 @@ void encode_File(off_t FileSize, char* file, int offset, char *arr) {
 			break;
 		arr[j] = file[i];
 		count++;
+		//if (file[i] == 'b' && i > 244000)
+			//fprintf(stderr, "Value of count is: %i\nValue of i is: %i\n", count, i);
 		while (file[i] == file[i + 1]) {
-			count++;
-			i++;
 			if (i >= offset+CHUNK_SIZE -1)
 				break;
+			count++;
+			i++;
+			//if (file[i] == 'b' && i > 244000)
+				//fprintf(stderr, "Value of count is: %i\nValue of i is: %i Value of offset is: %i\n", count, i,offset);
 		}
 		arr[j + 1] = count;
 		
@@ -123,8 +127,8 @@ void failOnExit(char** arr) {
 }
 int main(int argc, char* const* argv) {
 	int optIndex;
-	int threadCount = 1; //Default to one thread
-	off_t chunkSize = CHUNK_SIZE; //ASK ABOUT IF ITS 4096
+	int threadCount = 0; //Default to one thread
+	int chunkSize = CHUNK_SIZE; //ASK ABOUT IF ITS 4096
 	int fileOffset = 0;
 	int countOfChunks = 0;
 	char** TempArr = malloc(TASKSAVAILABLE); 
@@ -211,8 +215,12 @@ int main(int argc, char* const* argv) {
 		fileOffset = 0;
 		++i;
 	}
-
-	
+	if (threadCount == 0) {
+		for (int i = 0; i < taskCount; ++i) {
+			encode_File(taskQueue[i].fileInf.st_size, taskQueue[i].file, taskQueue[i].fileOff, taskQueue[i].arr);
+		}
+		taskCount = 0;
+	}
 	//Stop all running threads
 	while (taskCount != 0){}
 	shouldContinue = false;
@@ -221,30 +229,31 @@ int main(int argc, char* const* argv) {
 
 	while (threadsStillRunning > 0) { pthread_cond_broadcast(&jobCondition); }//fprintf(stderr, "threads running: %i\n", threadsStillRunning); }
 	//fprintf(stderr, "tasks completed\n");
-	while (!lastThread) {}
-	//pthread_cond_wait(&countSignal, &counting);
-	//fprintf(stderr, "Past main wait\n");
+	if (threadCount != 0) {
+		while (!lastThread) {}
+		//pthread_cond_wait(&countSignal, &counting);
+		//fprintf(stderr, "Past main wait\n");
 
-	//implement a semaphore here where each thread ups it and downs only when leaving. 
-	for (int i = 0; i < fileCount; ++i) {
-		if (fileArr[i] == NULL)
-			break;
-		
-		if (munmap(fileArr[i], fileSizes[i]) != 0) {
-			fprintf(stderr, "Error unmapping file: %c\n", fileArr[i]);
-			failOnExit(TempArr);
+		//implement a semaphore here where each thread ups it and downs only when leaving. 
+		for (int i = 0; i < fileCount; ++i) {
+			if (fileArr[i] == NULL)
+				break;
+
+			if (munmap(fileArr[i], fileSizes[i]) != 0) {
+				fprintf(stderr, "Error unmapping file: %c\n", fileArr[i]);
+				failOnExit(TempArr);
+			}
 		}
-	}
-	//fprintf(stderr, "threadcount is: %i\n", threadCount);
-	//Destroying threads and mutex
-	for (int i = 0; i < threadCount; i++) {
 		//fprintf(stderr, "threadcount is: %i\n", threadCount);
-		if (pthread_join(threadPool[i], NULL) != 0) {
-			perror("Could not join thread");
-			failOnExit(TempArr);
+		//Destroying threads and mutex
+		for (int i = 0; i < threadCount; i++) {
+			//fprintf(stderr, "threadcount is: %i\n", threadCount);
+			if (pthread_join(threadPool[i], NULL) != 0) {
+				perror("Could not join thread");
+				failOnExit(TempArr);
+			}
 		}
 	}
-
 	//fprintf(stderr, "before free filecount: %i\n", fileCount);
 
 	free(fileArr);
