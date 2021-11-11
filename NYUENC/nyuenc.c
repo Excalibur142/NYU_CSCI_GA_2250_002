@@ -96,8 +96,8 @@ void* funcStart(void* args) {
 			}
 			taskCount--;
 			pthread_mutex_unlock(&jobMutex);
-			//fprintf(stderr, "File size: %i\nFile offset:%i\n", task.fileInf.st_size, task.fileOff);
 			encode_File(task.fileInf.st_size, task.file, task.fileOff, task.arr);
+			//fprintf(stderr, "File size: %i\nFile offset:%i\n", task.fileInf.st_size, task.fileOff);
 
 		}
 	}
@@ -128,9 +128,10 @@ void failOnExit(char** arr) {
 }
 int main(int argc, char* const* argv) {
 	int optIndex;
-	int threadCount = 1; //Default to one thread
+	int threadCount = 0; //Default to one thread
 	int chunkSize = CHUNK_SIZE; //ASK ABOUT IF ITS 4096
 	int fileOffset = 0;
+	int ammountOfTasks = 0;
 	int countOfChunks = 0;
 	char** TempArr = malloc(TASKSAVAILABLE); 
 	//Get amount of threads to create and store in variable
@@ -153,14 +154,14 @@ int main(int argc, char* const* argv) {
 	pthread_cond_init(&countSignal, NULL);
 	for (int i = 0; i < threadCount; i++) {
 		if (pthread_create(&threadPool[i], NULL, &funcStart, NULL) != 0) {
-			perror("Could not create thread pool");
+			fprintf(stderr,"Could not create thread pool\n");
 			failOnExit(TempArr);
 		}
 		//pthread_mutex_lock(&counting);
 		threadsStillRunning++;
 		//pthread_mutex_unlock(&counting);
 	}
-	fprintf(stderr, "threads created: %i\n",threadsStillRunning);
+	//fprintf(stderr, "threads created: %i\n",threadsStillRunning);
 
 	//Find out how many files there are
 	int fileCount = 0;
@@ -183,16 +184,17 @@ int main(int argc, char* const* argv) {
 		fileArr[i] = mmap(NULL, fileSizes[i], PROT_READ, MAP_SHARED, fd, 0);
 		fileCount++;
 		if (fileArr[i] == MAP_FAILED) {
-			perror("Map failed to open file in virtual memory\n"); //error checking
+			fprintf(stderr,"Map failed to open file in virtual memory\n"); //error checking
 			failOnExit(TempArr);
 		}
 		close(fd); //close opened file now that it is in memory
 
 		//Divide file into chunks and submit to task queue
 		int tempSize = fileInfo.st_size;
-		fprintf(stderr, "About to chunk up data\n");
+		//fprintf(stderr, "About to chunk up data\n");
 
 		while (true) {
+			ammountOfTasks++;
 			TempArr[countOfChunks] = malloc(chunkSize *2);
 			if (tempSize - chunkSize > 0) {
 				//fprintf(stderr, "Chunking data Size: %i\n",tempSize);
@@ -214,148 +216,82 @@ int main(int argc, char* const* argv) {
 					.fileInf = fileInfo
 				};
 				addTask(temp);
-				fprintf(stderr, "Chunked last data\n");
+				//fprintf(stderr, "Chunked last data\n");
 				break;
 			}
 		}
 		fileOffset = 0;
 		++i;
 	}
-	//if (threadCount == 0) {
-	//	for (int i = 0; i < taskCount; ++i) {
-	//		encode_File(taskQueue[i].fileInf.st_size, taskQueue[i].file, taskQueue[i].fileOff, taskQueue[i].arr);
-	//	}
-	//	taskCount = 0;
-	//}
+	if (threadCount == 0) {
+		for (int i = 0; i < taskCount; ++i) {
+			encode_File(taskQueue[i].fileInf.st_size, taskQueue[i].file, taskQueue[i].fileOff, taskQueue[i].arr);
+		}
+		taskCount = 0;
+	}
 	//Stop all running threads
-	fprintf(stderr, "Test for jobs\n");
+	//fprintf(stderr, "Test for jobs\n");
 
 	while (taskCount != 0){}
 	shouldContinue = false;
 	pthread_cond_broadcast(&jobCondition);
-	fprintf(stderr, "Broadcast sent\n");
+	//fprintf(stderr, "Broadcast sent\n");
 
-	if (threadsStillRunning > 0) { pthread_cond_broadcast(&jobCondition); }//fprintf(stderr, "threads running: %i\n", threadsStillRunning); }
-	fprintf(stderr, "tasks completed\n");
-	////if (threadCount != 0) {
-	//	while (!lastThread) {}
-	//	//pthread_cond_wait(&countSignal, &counting);
-	//	//fprintf(stderr, "Past main wait\n");
-	//
-	//	//implement a semaphore here where each thread ups it and downs only when leaving. 
-	//	for (int i = 0; i < fileCount; ++i) {
-	//		if (fileArr[i] == NULL)
-	//			break;
-	//
-	//		if (munmap(fileArr[i], fileSizes[i]) != 0) {
-	//			fprintf(stderr, "Error unmapping file: %c\n", fileArr[i]);
-	//			failOnExit(TempArr);
-	//		}
-	//	}
-	//	//fprintf(stderr, "threadcount is: %i\n", threadCount);
-	//	//Destroying threads and mutex
-		for (int i = 0; i < threadCount; i++) {
-			//fprintf(stderr, "threadcount is: %i\n", threadCount);
-			if (pthread_join(threadPool[i], NULL) != 0) {
-				perror("Could not join thread");
-				failOnExit(TempArr);
-			}
+	if (threadsStillRunning > 0) { pthread_cond_broadcast(&jobCondition); }
+	//fprintf(stderr, "tasks completed\n");
+	
+	//Destroying threads and mutex
+	for (int i = 0; i < threadCount; i++) {
+		//fprintf(stderr, "threadcount is: %i\n", threadCount);
+		if (pthread_join(threadPool[i], NULL) != 0) {
+			perror("Could not join thread");
+			failOnExit(TempArr);
 		}
-	////}
-	//fprintf(stderr, "before free filecount: %i\n", fileCount);
-
+	}
+	
 	free(fileArr);
-	//fprintf(stderr, "in between free filecount: %i\n", fileCount);
 	free(fileSizes);
-	//fprintf(stderr, "after free filecount: %i\n", fileCount);
 	pthread_mutex_destroy(&jobMutex);
 	pthread_mutex_destroy(&counting);
 	pthread_cond_destroy(&jobCondition);
 	pthread_cond_destroy(&countSignal);
 
-	int printOffset = 0;
-	_Bool setOffset = false;
-	for (int i = 0; i < TASKSAVAILABLE; ++i) {
-		if (setOffset) {
-			printOffset = 2;
-			setOffset = false;
-		}
-		else
-			printOffset = 0;
-		if (TempArr[i] == NULL)
-			break; //break if no more left to print
-		for (int j = 0 + printOffset; j < chunkSize * 2; ++j) {
-			if (TempArr[i][j] != 0) {
-				if (TempArr[i][j + 2]) {
-					printf("%c", TempArr[i][j]);
-					fflush(stdout);
+	char last;
+	char lastNum;
+	for (int i = 0; i < ammountOfTasks; ++i) {
+		if (TempArr[i] != NULL) {
+			if (i+1 == ammountOfTasks) { //last element
+				if (last == TempArr[i][0]) {
+					printf("%c%c", last, lastNum + TempArr[i][1]);
+					printf("%.*s", strlen(TempArr[i]) - 2, TempArr[i] + 2);
+				}
+				else if(last){
+					printf("%c%c", last, lastNum);
+					printf("%s", TempArr[i]);
 				}
 				else
-				{
-					//last element char and count
-					//check if next element exits
-					if (TempArr[i + 1] != NULL) {
-						if (TempArr[i][j] == TempArr[i + 1][0]) {
-							printf("%c%c", TempArr[i][j], TempArr[i][j + 1] + TempArr[i + 1][1]);
-							setOffset = true;
-							fflush(stdout);
-	
-							break;
-						}
-					}
-					//next element does not exist, print both char and count
-					printf("%c%c", TempArr[i][j], TempArr[i][j + 1]);
-					fflush(stdout);
-					break;
-					
+					printf("%s", TempArr[i]);
+			}
+			else if (last == TempArr[i][0]) { //check if last char is the same
+				printf("%c%c", last, lastNum + TempArr[i][1]);
+				printf("%.*s", strlen(TempArr[i]) - 4, TempArr[i]+2);
+				last = TempArr[i][strlen(TempArr[i]) - 2];
+				lastNum = TempArr[i][strlen(TempArr[i]) - 1];
+			}
+			else { //print and chop off last 2 elements
+				if (last && last != TempArr[i][0]) {
+					printf("%c%c", last, lastNum);//dont drop last char if chunk boundary is not the same
 				}
+				printf("%.*s", strlen(TempArr[i]) - 2, TempArr[i]);
+				last = TempArr[i][strlen(TempArr[i]) - 2];
+				lastNum = TempArr[i][strlen(TempArr[i]) - 1];
 			}
 		}
+		else
+			break;
 	}
-	//char last;
-	//unsigned char lastCount;
-	//int printOffset = 0;
-	//_Bool setOffset = false;
-	//for (int i = 0; i < TASKSAVAILABLE; ++i) {
-	//	//if(!setOffset)
-	//	if (TempArr[i] == NULL)
-	//		break; //no more left to print
-	//	//Every  element check first and store last
-	//	//Print every character except for last char and ammount
-	//	if (TempArr[i][0] == last) {
-	//		lastCount += TempArr[i][1];
-	//		printf("%c%c", last, lastCount);
-	//		printOffset = 2;
-	//	}
-	//	for (int j = 0+printOffset; j < chunkSize * 2; ++j) {
-	//		if (TempArr[i][j] == 0)
-	//			break; //end of chunk element
-	//		if (TempArr[i][j + 2]) {
-	//				
-	//			printf("%c", TempArr[i][j]);
-	//			fflush(stdout);
-	//		}
-	//		else if (TempArr[i + 1] == NULL) {
-	//			//last element
-	//			printf("%c", TempArr[i][j]);
-	//		}
-	//		else {
-	//			printOffset = 0;
-	//			last = TempArr[i][j];
-	//			lastCount = TempArr[i][j + 1];
-	//			//fprintf(stderr, "Made it to last check, last is: %c %c\n", TempArr[i][j], last);
-	//			break;
-	//			//last char element of chunk
-	//		}
-	//	}		
-	//}
-	//for (int i = 0; i < TASKSAVAILABLE; ++i) {
-	//	if (TempArr[i] != NULL) {
-	//		printf("%s", TempArr[i]);
-	//	}
-	//	else
-	//		break;
-	//}
+
+
 	i = 0;
 	while (TempArr[i] != NULL) {
 		free(TempArr[i]);
