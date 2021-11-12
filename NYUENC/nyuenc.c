@@ -27,20 +27,14 @@ void encode_File(int FileSize, char* file, int offset, char *arr) {
 			break;
 		arr[j] = file[i];
 		count++;
-		//if (file[i] == 'b' && i > 244000)
-			//fprintf(stderr, "Value of count is: %i\nValue of i is: %i\n", count, i);
 		while (file[i] == file[i + 1]) {
 			if (i >= offset+CHUNK_SIZE -1)
 				break;
 			count++;
 			i++;
-			//if (file[i] == 'b' && i > 244000)
-				//fprintf(stderr, "Value of count is: %i\nValue of i is: %i Value of offset is: %i\n", count, i,offset);
 		}
-		arr[j + 1] = count;
-		
+		arr[j + 1] = count;		
 		j+=2;
-		//printf("%c%c", file[i], count);
 		count = 0;
 	}
 	return;
@@ -52,21 +46,16 @@ typedef struct Task {
 	int chunkSize; //how much to read (could be determined by offset)
 	char* arr; //where to store the information
 	struct stat fileInf;
-	//LIST_ENTRY(Task) entries;
 } Task;
-
-//LIST_HEAD(listhead, Task);
 
 Task taskQueue[TASKSAVAILABLE];
 int taskCount = 0;
 
-pthread_mutex_t counting;
-pthread_cond_t countSignal;
-int threadsStillRunning = 0;
-
 pthread_mutex_t jobMutex;
 pthread_cond_t jobCondition;
-_Bool lastThread = false;
+
+pthread_mutex_t printMutex;
+pthread_cond_t printCond;
 
 _Bool shouldContinue = true;
 void addTask(Task task) {
@@ -76,17 +65,11 @@ void addTask(Task task) {
 	pthread_cond_signal(&jobCondition);
 }
 void* funcStart(void* args) {
-	while (shouldContinue) {
-		//fprintf(stderr, "task running\n");
+	while (true) {
 		Task task;
 		pthread_mutex_lock(&jobMutex);
-		//fprintf(stderr, "task running but with mutex\n");
-
 		while (taskCount == 0) {
 			pthread_cond_wait(&jobCondition, &jobMutex);
-			if (shouldContinue == false)
-				break;
-			//fprintf(stderr, "task paused on job wait\n");
 		}
 		if (taskQueue[0].file != NULL) {
 			task = taskQueue[0];
@@ -97,23 +80,12 @@ void* funcStart(void* args) {
 			taskCount--;
 			pthread_mutex_unlock(&jobMutex);
 			encode_File(task.fileInf.st_size, task.file, task.fileOff, task.arr);
+			pthread_cond_signal(&printCond);
 			//fprintf(stderr, "File size: %i\nFile offset:%i\n", task.fileInf.st_size, task.fileOff);
 
 		}
 	}
-	//fprintf(stderr, "Trying to grab mutex\n");
-	pthread_mutex_lock(&counting);
-	threadsStillRunning--;
-	if (threadsStillRunning == 0) {
-		lastThread = true;
-	}
-	pthread_mutex_unlock(&counting);
-	//fprintf(stderr, "Released Thread Mutex\n");
-	//if (threadsStillRunning == 0) {
-	//	pthread_cond_signal(&countSignal);
-	//	fprintf(stderr, "Last Thread\n");
-	//
-	//}
+	
 	pthread_exit(NULL);
 }
 
@@ -141,7 +113,6 @@ int main(int argc, char* const* argv) {
 		case 'j':
 			//sscanf(optarg, "%d", &threadCount);
 			threadCount = atol(optarg);
-			//fprintf(stderr, "Jobs used, amount is: %d\n", threadCount);
 		default:
 			break;
 		}
@@ -149,20 +120,17 @@ int main(int argc, char* const* argv) {
 	//Creating threads
 	pthread_t* threadPool = malloc(threadCount * sizeof(pthread_t));
 	pthread_mutex_init(&jobMutex, NULL);
-	pthread_mutex_init(&counting, NULL);
+	pthread_mutex_init(&printMutex, NULL);
+	
 	pthread_cond_init(&jobCondition, NULL);
-	pthread_cond_init(&countSignal, NULL);
+	pthread_cond_init(&printCond, NULL);
+	
 	for (int i = 0; i < threadCount; i++) {
 		if (pthread_create(&threadPool[i], NULL, &funcStart, NULL) != 0) {
 			fprintf(stderr,"Could not create thread pool\n");
 			failOnExit(TempArr);
 		}
-		//pthread_mutex_lock(&counting);
-		threadsStillRunning++;
-		//pthread_mutex_unlock(&counting);
 	}
-	//fprintf(stderr, "threads created: %i\n",threadsStillRunning);
-
 	//Find out how many files there are
 	int fileCount = 0;
 	char** fileArr = malloc(argc * sizeof(char*));
@@ -191,13 +159,10 @@ int main(int argc, char* const* argv) {
 
 		//Divide file into chunks and submit to task queue
 		int tempSize = fileInfo.st_size;
-		//fprintf(stderr, "About to chunk up data\n");
-
 		while (true) {
 			ammountOfTasks++;
 			TempArr[countOfChunks] = malloc(chunkSize *2);
 			if (tempSize - chunkSize > 0) {
-				//fprintf(stderr, "Chunking data Size: %i\n",tempSize);
 				Task temp = {
 					.file = fileArr[i],
 					.fileOff = fileOffset,
@@ -216,7 +181,6 @@ int main(int argc, char* const* argv) {
 					.fileInf = fileInfo
 				};
 				addTask(temp);
-				//fprintf(stderr, "Chunked last data\n");
 				break;
 			}
 		}
@@ -229,36 +193,16 @@ int main(int argc, char* const* argv) {
 		}
 		taskCount = 0;
 	}
-	//Stop all running threads
-	//fprintf(stderr, "Test for jobs\n");
-
-	while (taskCount != 0){}
-	shouldContinue = false;
-	pthread_cond_broadcast(&jobCondition);
-	//fprintf(stderr, "Broadcast sent\n");
-
-	if (threadsStillRunning > 0) { pthread_cond_broadcast(&jobCondition); }
-	//fprintf(stderr, "tasks completed\n");
-	
-	//Destroying threads and mutex
-	for (int i = 0; i < threadCount; i++) {
-		//fprintf(stderr, "threadcount is: %i\n", threadCount);
-		if (pthread_join(threadPool[i], NULL) != 0) {
-			perror("Could not join thread");
-			failOnExit(TempArr);
-		}
-	}
-	
-	free(fileArr);
-	free(fileSizes);
-	pthread_mutex_destroy(&jobMutex);
-	pthread_mutex_destroy(&counting);
-	pthread_cond_destroy(&jobCondition);
-	pthread_cond_destroy(&countSignal);
 
 	char last;
 	char lastNum;
 	for (int i = 0; i < ammountOfTasks; ++i) {
+		pthread_mutex_lock(&printMutex);
+		while (TempArr[i] == NULL) {
+			pthread_cond_wait(&printCond, &printMutex);
+		}
+		pthread_mutex_unlock(&printMutex);
+		//Only print a task if thread is done, 
 		if (TempArr[i] != NULL) {
 			if (i+1 == ammountOfTasks) { //last element
 				if (last == TempArr[i][0]) {
@@ -290,8 +234,10 @@ int main(int argc, char* const* argv) {
 		else
 			break;
 	}
-
-
+	
+	free(fileArr);
+	free(fileSizes);
+	
 	i = 0;
 	while (TempArr[i] != NULL) {
 		free(TempArr[i]);
