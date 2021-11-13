@@ -1,5 +1,5 @@
-CC=gcc
-CFLAGS=-g
+CC=gcc -pthread
+CFLAGS=-g 
 
 .PHONY: all
 all: nyuenc

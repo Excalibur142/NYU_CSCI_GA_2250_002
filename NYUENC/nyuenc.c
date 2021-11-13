@@ -7,7 +7,6 @@
 #include <sys/mman.h>
 #include <fcntl.h>
 #include <sys/stat.h>
-#include <sys/queue.h>
 #include <pthread.h>
 #include <time.h>
 #include <stdbool.h>
@@ -45,7 +44,9 @@ typedef struct Task {
 	int fileOff; //where to read from
 	int chunkSize; //how much to read (could be determined by offset)
 	char* arr; //where to store the information
-	struct stat fileInf;
+	struct stat fileInf; //file information
+	_Bool* writeCheck; //if write is finished
+	int index; //where to store parallel bool writecheck at index of arr
 } Task;
 
 Task taskQueue[TASKSAVAILABLE];
@@ -57,12 +58,11 @@ pthread_cond_t jobCondition;
 pthread_mutex_t printMutex;
 pthread_cond_t printCond;
 
-_Bool shouldContinue = true;
 void addTask(Task task) {
 	pthread_mutex_lock(&jobMutex);
 	taskQueue[taskCount++] = task;
-	pthread_mutex_unlock(&jobMutex);
 	pthread_cond_signal(&jobCondition);
+	pthread_mutex_unlock(&jobMutex);
 }
 void* funcStart(void* args) {
 	while (true) {
@@ -80,7 +80,10 @@ void* funcStart(void* args) {
 			taskCount--;
 			pthread_mutex_unlock(&jobMutex);
 			encode_File(task.fileInf.st_size, task.file, task.fileOff, task.arr);
+			pthread_mutex_lock(&printMutex);
+			task.writeCheck[task.index] = true;
 			pthread_cond_signal(&printCond);
+			pthread_mutex_unlock(&printMutex);
 			//fprintf(stderr, "File size: %i\nFile offset:%i\n", task.fileInf.st_size, task.fileOff);
 
 		}
@@ -88,7 +91,7 @@ void* funcStart(void* args) {
 	
 	pthread_exit(NULL);
 }
-
+//Free memory before exiting
 void failOnExit(char** arr) {
 	int i = 0;
 	while (arr[i] != NULL) {
@@ -106,6 +109,7 @@ int main(int argc, char* const* argv) {
 	int ammountOfTasks = 0;
 	int countOfChunks = 0;
 	char** TempArr = malloc(TASKSAVAILABLE); 
+	_Bool* finishedWrite = malloc(TASKSAVAILABLE);
 	//Get amount of threads to create and store in variable
 	while ((optIndex = getopt(argc, argv, ":j:")) != -1) {
 		switch (optIndex)
@@ -166,8 +170,10 @@ int main(int argc, char* const* argv) {
 				Task temp = {
 					.file = fileArr[i],
 					.fileOff = fileOffset,
-					.arr = TempArr[countOfChunks++],
-					.fileInf = fileInfo
+					.arr = TempArr[countOfChunks],
+					.fileInf = fileInfo,
+					.writeCheck = finishedWrite,
+					.index = countOfChunks++
 				};
 				fileOffset += chunkSize;
 				addTask(temp);
@@ -177,8 +183,10 @@ int main(int argc, char* const* argv) {
 				Task temp = {
 					.file = fileArr[i],
 					.fileOff = fileOffset,
-					.arr = TempArr[countOfChunks++],
-					.fileInf = fileInfo
+					.arr = TempArr[countOfChunks],
+					.fileInf = fileInfo,
+					.writeCheck = finishedWrite,
+					.index = countOfChunks++
 				};
 				addTask(temp);
 				break;
@@ -190,6 +198,7 @@ int main(int argc, char* const* argv) {
 	if (threadCount == 0) {
 		for (int i = 0; i < taskCount; ++i) {
 			encode_File(taskQueue[i].fileInf.st_size, taskQueue[i].file, taskQueue[i].fileOff, taskQueue[i].arr);
+			finishedWrite[i] = true;
 		}
 		taskCount = 0;
 	}
@@ -198,7 +207,10 @@ int main(int argc, char* const* argv) {
 	char lastNum;
 	for (int i = 0; i < ammountOfTasks; ++i) {
 		pthread_mutex_lock(&printMutex);
-		while (TempArr[i] == NULL) {
+		//while (TempArr[i] == NULL) {
+		//	pthread_cond_wait(&printCond, &printMutex); //try test and wait or compare and swap
+		//}
+		while (finishedWrite[i] == false) {
 			pthread_cond_wait(&printCond, &printMutex);
 		}
 		pthread_mutex_unlock(&printMutex);
@@ -237,7 +249,7 @@ int main(int argc, char* const* argv) {
 	
 	free(fileArr);
 	free(fileSizes);
-	
+	free(finishedWrite);
 	i = 0;
 	while (TempArr[i] != NULL) {
 		free(TempArr[i]);
