@@ -64,6 +64,27 @@ void fail() {
 	printf("Usage: ./nyufile disk <options>\n	- i                     Print the file system information.\n	- l                     List the root directory.\n	- r filename [-s sha1]  Recover a contiguous file.\n	- R filename - s sha1    Recover a possibly non - contiguous file.\n");
 	exit(1);
 }
+void writeIntToDisk(unsigned int Num, char* diskToWrite, int byteOffset) {
+
+	unsigned char num[8];
+	unsigned char nums[4];
+	for (int i = 0; i < 8; ++i)
+		num[i] = 0;
+	int count = 0;
+	while (true) {
+		num[count++] = Num % 16;
+		if (Num / 16 == 0)
+			break;
+		Num = Num / 16;
+	}
+	nums[0] = num[1] * 16 + num[0];
+	nums[1] = num[3] * 16 + num[2];
+	nums[2] = num[5] * 16 + num[4];
+	nums[3] = num[7] * 16 + num[6];
+	for (int i = 0; i < 4; ++i) {
+		diskToWrite[byteOffset + i] = nums[i];
+	}
+}
 
 int main(int argc, char* argv[]) {
 	_Bool noOption = true;
@@ -75,7 +96,7 @@ int main(int argc, char* argv[]) {
 	_Bool sha1Chosen = false;
 	char* sha1Value;
 	char* fileToRecover;
-	if (argc >= 3){
+	if (argc >= 3) {
 		if (argv[2][0] != '-') {
 			//second argument is not an arg
 			fail();
@@ -84,7 +105,7 @@ int main(int argc, char* argv[]) {
 	char* diskName = argv[1];
 	char* nextInd;
 	int ch;
-	while ((ch = getopt(argc, argv, "ilr:R:s:")) != -1 ) {
+	while ((ch = getopt(argc, argv, "ilr:R:s:")) != -1) {
 		if (optind == 2)
 			fail();
 		nextInd = argv[optind];
@@ -95,7 +116,7 @@ int main(int argc, char* argv[]) {
 			infoChosen = true;
 			break;
 		case 'l':
-			listChosen = true; 
+			listChosen = true;
 			break;
 		case 'r':
 			fileToRecover = *&optarg;
@@ -120,22 +141,22 @@ int main(int argc, char* argv[]) {
 		fail();
 	}
 	//Open FAT Disk Image
-	int fd = open(diskName, O_RDONLY);
+	int fd = open(diskName, O_RDWR);
 	if (fd < 0) {
 		fprintf(stderr, "File open failed on: %s \n", diskName);
 		exit(1);
 	}
 	struct stat fileInfo;
 	fstat(fd, &fileInfo);
-	char* fatDisk = mmap(NULL, fileInfo.st_size, PROT_READ, MAP_SHARED, fd, 0);
+	char* fatDisk = mmap(NULL, fileInfo.st_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
 	close(fd);
 	BootEntry BootInfo;
 	//Grab boot info for milestone 2
 	BootInfo.BPB_NumFATs = fatDisk[16];
-	BootInfo.BPB_BytsPerSec = (fatDisk[12]*256) + fatDisk[11];
+	BootInfo.BPB_BytsPerSec = (fatDisk[12] * 256) + fatDisk[11];
 	BootInfo.BPB_SecPerClus = fatDisk[13];
-	BootInfo.BPB_RsvdSecCnt = (fatDisk[15] *256) + fatDisk[14];
-	
+	BootInfo.BPB_RsvdSecCnt = (fatDisk[15] * 256) + fatDisk[14];
+
 	if (infoChosen) {
 		printf("Number of FATs = %i\n", BootInfo.BPB_NumFATs);
 		printf("Number of bytes per sector = %i\n", BootInfo.BPB_BytsPerSec);
@@ -172,8 +193,8 @@ int main(int argc, char* argv[]) {
 	while (fatDisk[i] != 0) {
 		RootDir[j] = malloc(sizeof(DirEntry));
 		memcpy(&RootDir[j]->DIR_Name, &fatDisk[i], 11);
-		RootDir[j]->DIR_Attr = fatDisk[i+11];
-		RootDir[j]->DIR_FileSize = fatDisk[i+28] + (fatDisk[i + 29] << 8) + (fatDisk[i + 30] << 16) + (fatDisk[i + 31] << 24);
+		RootDir[j]->DIR_Attr = fatDisk[i + 11];
+		RootDir[j]->DIR_FileSize = fatDisk[i + 28] + (fatDisk[i + 29] << 8) + (fatDisk[i + 30] << 16) + (fatDisk[i + 31] << 24);
 		RootDir[j]->DIR_FstClusLO = fatDisk[i + 26] + (fatDisk[i + 27] << 8);
 		RootDir[j]->DIR_FstClusHI = fatDisk[i + 20] + (fatDisk[i + 21] << 8);
 		//int startingCluster = fatDisk[i + 26] + (fatDisk[i + 27] << 8) + (fatDisk[i + 20] << 16) + (fatDisk[i + 21] << 24);
@@ -207,7 +228,7 @@ int main(int argc, char* argv[]) {
 			int startingCluster = RootDir[i]->DIR_FstClusLO + (RootDir[i]->DIR_FstClusHI << 16);
 			if (RootDir[i]->DIR_Attr == 16) {
 				//Directory found
-				printf("%.*s/ (size = %i, starting cluster = %i)\n", 11-amountToChop-amountToChopExt, RootDir[i]->DIR_Name, RootDir[i]->DIR_FileSize, startingCluster);
+				printf("%.*s/ (size = %i, starting cluster = %i)\n", 11 - amountToChop - amountToChopExt, RootDir[i]->DIR_Name, RootDir[i]->DIR_FileSize, startingCluster);
 			}
 			else if (amountToChopExt < 3) {
 				//if file extension is not empty, print dot
@@ -216,10 +237,105 @@ int main(int argc, char* argv[]) {
 			else
 				printf("%.*s%.*s (size = %i, starting cluster = %i)\n", 8 - amountToChop, RootDir[i]->DIR_Name, 3 - amountToChopExt, RootDir[i]->DIR_Name + 8, RootDir[i]->DIR_FileSize, startingCluster);
 		}
-		printf("Total number of entries = %i\n", numEntries-numEntriesDeleted);
+		printf("Total number of entries = %i\n", numEntries - numEntriesDeleted);
 	}
 
+	if (recContigChosen) {
+		//Recover a contiguously allocated file when sha1 has not been supplied
+		//format fileToRecover to be in structure of directory entry
+		char recoverFile[11];
+		memset(recoverFile, ' ', 11);
+		//Check if fileToRecover has a dot ext
+		int indexOfDot;
+		_Bool indexFound = false;
+		for (int i = 0; i < strlen(fileToRecover); ++i) {
+			if (fileToRecover[i] == '.') {
+				indexOfDot = i;
+				indexFound = true;
+				break;
+			}
+		}
+		if (indexFound) {
+			//fileToRecover has an extension
+			for (int i = 0; i < indexOfDot; ++i) {
+				recoverFile[i] = fileToRecover[i];
+			}
+			int j = 0;
+			for (int i = indexOfDot + 1; i < indexOfDot + 4; ++i) {
+				recoverFile[8 + j] = fileToRecover[i];
+				++j;
+			}
+		}
+		else {
+			memcpy(recoverFile, fileToRecover, 11);
+			//Pad with zeros
+			for (int i = strlen(fileToRecover); i < 11; ++i) {
+				recoverFile[i] = ' ';
+			}
+		}
+		//go through root directory and see if file can be found
+		int indexOfFileToRecover;
+		int countOfFilesMatched = 0;
+		for (int i = 0; i < numEntries; ++i) {
+			if (strncmp(RootDir[i]->DIR_Name + 1, recoverFile + 1,10) == 0) {
+				//printf("File found\n");
+				indexOfFileToRecover = i;
+				countOfFilesMatched++;
+			}
+		}
+		if (countOfFilesMatched > 1) {
+			printf("%s: multiple candidates found\n", fileToRecover);
+			exit(1);
+		}
+		else if (countOfFilesMatched < 1) {
+			printf("%s: file not found\n", fileToRecover);
+			exit(1);
+		}
 
+		//Change e5 to first letter
+		fatDisk[rootDirData + (32*indexOfFileToRecover)] = fileToRecover[0];
+		//File found now, recover it
+		//To recover a small file that spans the size of one cluster change starting cluster to EOC
+		//First fat is after reserved data (every other fat is nth FAT(FAT SIZE) + 1st FAT start plus
+		int FirstFatStart = (BootInfo.BPB_RsvdSecCnt * BootInfo.BPB_BytsPerSec);
+		//First 12 bytes are reserved? Multiply cluster number by 4 to get byte location in FAT
+		int startingCluster = RootDir[indexOfFileToRecover]->DIR_FstClusLO + (RootDir[indexOfFileToRecover]->DIR_FstClusHI << 16);
+
+		if(startingCluster != 0){
+		//If there is a starting cluster, update FATs, if not dont update and return file update successful. DIR entry updated
+		
+		int clustersOccupied = RootDir[indexOfFileToRecover]->DIR_FileSize / (BootInfo.BPB_BytsPerSec * BootInfo.BPB_SecPerClus);
+		
+		//IF FILE IS ONLY 1 CLUSTER LONG DO THIS
+			if (clustersOccupied == 1) {
+				int bytesToChange = startingCluster * 4;
+				for (int j = 0; j < BootInfo.BPB_NumFATs; ++j) {
+					for (int i = 0; i < 3; ++i) {
+						fatDisk[(j * BootInfo.BPB_FATSz32 * BootInfo.BPB_BytsPerSec) + FirstFatStart + bytesToChange + i] = 255;
+					}
+					fatDisk[(j * BootInfo.BPB_FATSz32 * BootInfo.BPB_BytsPerSec) + FirstFatStart + bytesToChange + 3] = 15;
+
+				}
+			}
+			else {
+		//FILE IS MORE THAN ONE CLUSTER!!
+				//How many clusters does this thing span?
+				//Divide file size by bytes per cluster (cluster may have more than one sector)
+				//Go through FATs and change cluster sequences
+				for (int j = 0; j < BootInfo.BPB_NumFATs; ++j) {
+					for (int k = 0; k < clustersOccupied; ++k) {
+						//Change each cluster in a FAT
+						//Convert next cluster number to little endian format
+						if(k+1 == clustersOccupied)
+							writeIntToDisk(268435455, fatDisk, (j * BootInfo.BPB_FATSz32 * BootInfo.BPB_BytsPerSec) + FirstFatStart + (startingCluster+k) * 4);
+						else
+							writeIntToDisk(startingCluster + k+1, fatDisk, (j* BootInfo.BPB_FATSz32* BootInfo.BPB_BytsPerSec) + FirstFatStart + (startingCluster+k)*4);
+					}
+				}
+			}
+		}
+		printf("%s: successfully recovered\n", fileToRecover);
+	}
 
 
 	return 0;
