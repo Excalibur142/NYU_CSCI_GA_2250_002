@@ -155,6 +155,10 @@ int main(int argc, char* argv[]) {
 		case 's':
 			sha1Value = *&optarg;
 			sha1Chosen = true;
+			if (strlen(sha1Value) % 40 != 0) {
+				printf("%s: file not found\n", fileToRecover);
+				exit(1);
+			}
 			break;
 		default:
 			//Print usage and exit
@@ -327,7 +331,7 @@ int main(int argc, char* argv[]) {
 			//If one matches, set the indexOfFileToRecover to the matching file.
 			//If none match, return failure and exit. 
 		if (sha1Chosen) {
-			_Bool matchFound = true;
+			_Bool matchFound = false;
 			for (int i = 0; i < numEntries; ++i) {
 				if (strncmp(RootDir[i]->DIR_Name + 1, recoverFile + 1, 10) == 0) {
 					//Found an ambiguous file
@@ -344,10 +348,14 @@ int main(int argc, char* argv[]) {
 						sha1ValHex[i] = hex2byte(sha1Value + k);
 					}
 					//Check if entry is the one specified
-					for (int j = 0; j < 20; ++j) {
-						if (sha1Sum[j] != sha1ValHex[j])
-							matchFound = false;
-					}
+					//for (int j = 0; j < 20; ++j) {
+					//	if (sha1Sum[j] != sha1ValHex[j]) {
+					//		printf("Orig: %c Decoded %c\n", sha1Sum[j], sha1ValHex[j]);
+					//		matchFound = false;
+					//	}
+					//}
+					if (strncmp(sha1Sum, sha1ValHex, 20) == 0)
+						matchFound = true;
 					if (matchFound) {
 						indexOfFileToRecover = i;
 						break;
@@ -382,7 +390,6 @@ int main(int argc, char* argv[]) {
 						fatDisk[(j * BootInfo.BPB_FATSz32 * BootInfo.BPB_BytsPerSec) + FirstFatStart + bytesToChange + i] = 255;
 					}
 					fatDisk[(j * BootInfo.BPB_FATSz32 * BootInfo.BPB_BytsPerSec) + FirstFatStart + bytesToChange + 3] = 15;
-
 				}
 			}
 			else {
@@ -402,7 +409,11 @@ int main(int argc, char* argv[]) {
 				}
 			}
 		}
-		printf("%s: successfully recovered\n", fileToRecover);
+		if (sha1Chosen) {
+			printf("%s: successfully recovered with SHA-1\n", fileToRecover);
+		}
+		else
+			printf("%s: successfully recovered\n", fileToRecover);
 	}
 
 
