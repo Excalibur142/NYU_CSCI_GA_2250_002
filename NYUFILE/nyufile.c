@@ -10,6 +10,9 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <byteswap.h>
+#include <openssl/sha.h>
+
+#define SHA_DIGEST_LENGTH 20
 
 #pragma pack(push,1)
 typedef struct BootEntry {
@@ -84,6 +87,29 @@ void writeIntToDisk(unsigned int Num, char* diskToWrite, int byteOffset) {
 	for (int i = 0; i < 4; ++i) {
 		diskToWrite[byteOffset + i] = nums[i];
 	}
+}
+
+//Reference: https://stackoverflow.com/questions/25748791/how-to-form-an-asciihex-number-using-2-chars
+//Reference only for hex_decode function taken from website
+char hex2byte(char* hs)
+{
+	char b = 0;
+	char nibbles[2];
+	int i;
+
+	for (i = 0; i < 2; i++) {
+		if ((hs[i] >= '0') && (hs[i] <= '9'))
+			nibbles[i] = hs[i] - '0';
+		else if ((hs[i] >= 'A') && (hs[i] <= 'F'))
+			nibbles[i] = (hs[i] - 'A') + 10;
+		else if ((hs[i] >= 'a') && (hs[i] <= 'f'))
+			nibbles[i] = (hs[i] - 'a') + 10;
+		else
+			return 0;
+	}
+
+	b = (nibbles[0] << 4) | nibbles[1];
+	return b;
 }
 
 int main(int argc, char* argv[]) {
@@ -284,12 +310,54 @@ int main(int argc, char* argv[]) {
 			}
 		}
 		if (countOfFilesMatched > 1) {
-			printf("%s: multiple candidates found\n", fileToRecover);
-			exit(1);
+			if (!sha1Chosen) {
+				printf("%s: multiple candidates found\n", fileToRecover);
+				exit(1);
+			}
 		}
 		else if (countOfFilesMatched < 1) {
 			printf("%s: file not found\n", fileToRecover);
 			exit(1);
+		}
+
+		//Very poorly written unoptimized code
+		//if sha1 has been entered:
+			//Go through the directory again and search the actual file(sector) that the sha1 matches. 
+				//Brute force every ambiguous file -> This will catch both single and contiguous cluster files
+			//If one matches, set the indexOfFileToRecover to the matching file.
+			//If none match, return failure and exit. 
+		if (sha1Chosen) {
+			_Bool matchFound = true;
+			for (int i = 0; i < numEntries; ++i) {
+				if (strncmp(RootDir[i]->DIR_Name + 1, recoverFile + 1, 10) == 0) {
+					//Found an ambiguous file
+					//Compute size of bytes to read.
+					int clustersOcc = (RootDir[i]->DIR_FileSize + ((BootInfo.BPB_BytsPerSec * BootInfo.BPB_SecPerClus) -1 )) / (BootInfo.BPB_BytsPerSec * BootInfo.BPB_SecPerClus); //is this needed?
+					char sha1Sum[20];
+					//Calculate where cluster data is in bytes
+					int startClus = RootDir[i]->DIR_FstClusLO + (RootDir[i]->DIR_FstClusHI << 16);
+					SHA1(fatDisk + ((startClus - 2) * BootInfo.BPB_SecPerClus * BootInfo.BPB_BytsPerSec) + dataArea, RootDir[i]->DIR_FileSize, sha1Sum);
+
+					char sha1ValHex[20];
+					//Decode ascii hex string into hex array of 2 ascii letters for 1 byte
+					for (int i = 0, k = 0; k < 40; k += 2, ++i) {
+						sha1ValHex[i] = hex2byte(sha1Value + k);
+					}
+					//Check if entry is the one specified
+					for (int j = 0; j < 20; ++j) {
+						if (sha1Sum[j] != sha1ValHex[j])
+							matchFound = false;
+					}
+					if (matchFound) {
+						indexOfFileToRecover = i;
+						break;
+					}
+				}
+			}
+			if (!matchFound) {
+				printf("%s: file not found\n", fileToRecover);
+				exit(1);
+			}
 		}
 
 		//Change e5 to first letter
@@ -304,7 +372,7 @@ int main(int argc, char* argv[]) {
 		if(startingCluster != 0){
 		//If there is a starting cluster, update FATs, if not dont update and return file update successful. DIR entry updated
 		
-		int clustersOccupied = RootDir[indexOfFileToRecover]->DIR_FileSize / (BootInfo.BPB_BytsPerSec * BootInfo.BPB_SecPerClus);
+		int clustersOccupied = (RootDir[indexOfFileToRecover]->DIR_FileSize + ((BootInfo.BPB_BytsPerSec * BootInfo.BPB_SecPerClus) - 1)) / (BootInfo.BPB_BytsPerSec * BootInfo.BPB_SecPerClus);
 		
 		//IF FILE IS ONLY 1 CLUSTER LONG DO THIS
 			if (clustersOccupied == 1) {
