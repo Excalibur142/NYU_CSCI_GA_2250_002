@@ -60,11 +60,12 @@ typedef struct DirEntry {
 	unsigned short DIR_WrtDate;       // Written day
 	unsigned short DIR_FstClusLO;     // Low 2 bytes of the first cluster address *******IMPORTANT*******
 	unsigned int   DIR_FileSize;      // File size in bytes. (0 for directories) *******IMPORTANT*******
+	unsigned int   DIR_ActualStart;   // Actual byte start of root directory entry
 } DirEntry;
 #pragma pack(pop)
 
 void fail() {
-	printf("Usage: ./nyufile disk <options>\n	- i                     Print the file system information.\n	- l                     List the root directory.\n	- r filename [-s sha1]  Recover a contiguous file.\n	- R filename - s sha1    Recover a possibly non - contiguous file.\n");
+	printf("Usage: ./nyufile disk <options>\n  -i                     Print the file system information.\n  -l                     List the root directory.\n  -r filename [-s sha1]  Recover a contiguous file.\n  -R filename -s sha1    Recover a possibly non-contiguous file.\n");
 	exit(1);
 }
 void writeIntToDisk(unsigned int Num, char* diskToWrite, int byteOffset) {
@@ -90,7 +91,7 @@ void writeIntToDisk(unsigned int Num, char* diskToWrite, int byteOffset) {
 }
 
 //Reference: https://stackoverflow.com/questions/25748791/how-to-form-an-asciihex-number-using-2-chars
-//Reference only for hex_decode function taken from website
+//Reference only for how to hex decode a string literal
 char hex2byte(char* hs)
 {
 	char b = 0;
@@ -120,7 +121,7 @@ int main(int argc, char* argv[]) {
 	_Bool recContigChosen = false;
 	_Bool recNonContigChosen = false;
 	_Bool sha1Chosen = false;
-	char* sha1Value;
+	unsigned char* sha1Value;
 	char* fileToRecover;
 	if (argc >= 3) {
 		if (argv[2][0] != '-') {
@@ -170,6 +171,8 @@ int main(int argc, char* argv[]) {
 	if (noOption || nextInd != NULL) {
 		fail();
 	}
+	if ((infoChosen && listChosen) || (infoChosen && recContigChosen) || (infoChosen && recNonContigChosen) || (listChosen && recContigChosen) || (listChosen && recNonContigChosen))
+		fail();
 	//Open FAT Disk Image
 	int fd = open(diskName, O_RDWR);
 	if (fd < 0) {
@@ -204,23 +207,54 @@ int main(int argc, char* argv[]) {
 	//printf("root cluster is at: %i\n", BootInfo.BPB_RootClus);
 	BootInfo.BPB_FATSz32 = fatDisk[36] + (fatDisk[37] << 8) + (fatDisk[38] << 16) + (fatDisk[39] << 24);
 	//printf("Fat size in sectors: %i\n", BootInfo.BPB_FATSz32);
-	int dataArea = (BootInfo.BPB_RsvdSecCnt * BootInfo.BPB_BytsPerSec) + ((BootInfo.BPB_NumFATs * BootInfo.BPB_FATSz32) * BootInfo.BPB_BytsPerSec);
+	unsigned int dataArea = (BootInfo.BPB_RsvdSecCnt * BootInfo.BPB_BytsPerSec) + ((BootInfo.BPB_NumFATs * BootInfo.BPB_FATSz32) * BootInfo.BPB_BytsPerSec);
 	//printf("Data area starts at byte: %i\n", dataArea);
 	//Do some math to find where root directory is
-	int rootDirData = ((BootInfo.BPB_RootClus - 2) * BootInfo.BPB_SecPerClus) * BootInfo.BPB_BytsPerSec + dataArea;
+	unsigned int rootDirData = ((BootInfo.BPB_RootClus - 2) * BootInfo.BPB_SecPerClus) * BootInfo.BPB_BytsPerSec + dataArea;
+	//First fat is after reserved data (every other fat is nth FAT(FAT SIZE) + 1st FAT start plus
+	unsigned int FirstFatStart = (BootInfo.BPB_RsvdSecCnt * BootInfo.BPB_BytsPerSec);
+	//Size of a cluster in bytes is:
+	int clusterSizeInBytes = BootInfo.BPB_SecPerClus * BootInfo.BPB_BytsPerSec;
 	//printf("Root directory starts at: %i\n", rootDirData);
 	//Read directory 
 	//Loop through directory and find number of entries
-	int i = rootDirData;
-	int numEntries = 0; //WILL INCLUDE "DELETED" FILES
-	while (fatDisk[i] != 0) {
-		numEntries++;
-		i += 32;
-	}
+	unsigned int i = rootDirData;
+	//while (fatDisk[i] != 0) {//Goes till end of cluster --------------------------------CHANGE TO REPRESENT ACTUAL FILE COUNT
+	//	numEntries++;
+	//	i += 32;
+	//}
+	int numEntries = (BootInfo.BPB_FATSz32 * BootInfo.BPB_BytsPerSec) / 32; //WILL INCLUDE "DELETED" FILES
 	DirEntry** RootDir = malloc(sizeof(DirEntry*) * numEntries);
 	i = rootDirData;
 	int j = 0;
-	while (fatDisk[i] != 0) {
+	unsigned int temp = FirstFatStart + (BootInfo.BPB_RootClus * 4);
+	unsigned int previousCluster = BootInfo.BPB_RootClus;
+	//printf("previous cluster: %i\n", previousCluster);
+	int numLessThanClusterSize = 0;
+	numEntries = 0;
+	while (numLessThanClusterSize < clusterSizeInBytes+1) { //Goes till end of cluster
+		if (fatDisk[i] == 0) {
+			i += 32; //if hole, skip it
+			numLessThanClusterSize += 32;
+			break;
+		}
+		if (numLessThanClusterSize >= clusterSizeInBytes ) { //if root dir spans across multiple clusters, go back to fat disk and make i the new offest
+			//fprintf(stderr, "Previous cluster, fatDisk at: %i\n", previousCluster);
+			//Check if previous clustersize is FFFFFF0F
+			//checks if the second byte of the name is 0a
+			//go back to FAT to get next cluster
+			unsigned int k = FirstFatStart + (previousCluster * 4);
+			//printf("k: %i\n", k);
+			unsigned int nextCluster = fatDisk[k] + (fatDisk[k + 1] << 8) + (fatDisk[k + 2] << 16) + (fatDisk[k + 3] << 24);
+			//fprintf(stderr, "Found new cluster, fatDisk at: %i\n", nextCluster);
+			if (nextCluster >= 250000000)
+				break;
+			previousCluster = nextCluster;
+			//set i to where next cluster is
+			i = ((nextCluster - 2) * BootInfo.BPB_SecPerClus) * BootInfo.BPB_BytsPerSec + dataArea;
+			//printf("%i\n", i);
+			numLessThanClusterSize = 0;
+		}
 		RootDir[j] = malloc(sizeof(DirEntry));
 		memcpy(&RootDir[j]->DIR_Name, &fatDisk[i], 11);
 		RootDir[j]->DIR_Attr = fatDisk[i + 11];
@@ -228,8 +262,11 @@ int main(int argc, char* argv[]) {
 		RootDir[j]->DIR_FstClusLO = fatDisk[i + 26] + (fatDisk[i + 27] << 8);
 		RootDir[j]->DIR_FstClusHI = fatDisk[i + 20] + (fatDisk[i + 21] << 8);
 		//int startingCluster = fatDisk[i + 26] + (fatDisk[i + 27] << 8) + (fatDisk[i + 20] << 16) + (fatDisk[i + 21] << 24);
+		RootDir[j]->DIR_ActualStart = i; //where i is the actual byte location of each directory entry starting point !!!Useful for changing e5 to letter!!!
 		j++;
 		i += 32;
+		numEntries++;
+		numLessThanClusterSize += 32;
 	}
 	int numEntriesDeleted = 0;
 	if (listChosen) {
@@ -258,7 +295,12 @@ int main(int argc, char* argv[]) {
 			int startingCluster = RootDir[i]->DIR_FstClusLO + (RootDir[i]->DIR_FstClusHI << 16);
 			if (RootDir[i]->DIR_Attr == 16) {
 				//Directory found
-				printf("%.*s/ (size = %i, starting cluster = %i)\n", 11 - amountToChop - amountToChopExt, RootDir[i]->DIR_Name, RootDir[i]->DIR_FileSize, startingCluster);
+				if (amountToChopExt < 3) {
+					printf("%.*s.%.*s/ (size = %i, starting cluster = %i)\n", 8 - amountToChop, RootDir[i]->DIR_Name, 3 - amountToChopExt, RootDir[i]->DIR_Name + 8, RootDir[i]->DIR_FileSize, startingCluster);
+				}
+				else {
+					printf("%.*s/ (size = %i, starting cluster = %i)\n", 8 - amountToChop, RootDir[i]->DIR_Name, RootDir[i]->DIR_FileSize, startingCluster);
+				}
 			}
 			else if (amountToChopExt < 3) {
 				//if file extension is not empty, print dot
@@ -273,7 +315,7 @@ int main(int argc, char* argv[]) {
 	if (recContigChosen) {
 		//Recover a contiguously allocated file when sha1 has not been supplied
 		//format fileToRecover to be in structure of directory entry
-		char recoverFile[11];
+		unsigned char recoverFile[11];
 		memset(recoverFile, ' ', 11);
 		//Check if fileToRecover has a dot ext
 		int indexOfDot;
@@ -284,6 +326,10 @@ int main(int argc, char* argv[]) {
 				indexFound = true;
 				break;
 			}
+		}
+		if (indexFound && strlen(fileToRecover) - indexOfDot > 4) {
+			printf("%s: file not found\n", fileToRecover);
+			exit(1);
 		}
 		if (indexFound) {
 			//fileToRecover has an extension
@@ -303,11 +349,15 @@ int main(int argc, char* argv[]) {
 				recoverFile[i] = ' ';
 			}
 		}
+		//printf("file to recover: %s\n", fileToRecover);
+		//printf("recoverFile: %s\n", recoverFile);
 		//go through root directory and see if file can be found
 		int indexOfFileToRecover;
 		int countOfFilesMatched = 0;
 		for (int i = 0; i < numEntries; ++i) {
-			if (strncmp(RootDir[i]->DIR_Name + 1, recoverFile + 1,10) == 0) {
+			if (RootDir[i]->DIR_Name[0] != 229)
+				continue;
+			if (strncmp(RootDir[i]->DIR_Name + 1, recoverFile + 1, 10) == 0) {
 				//printf("File found\n");
 				indexOfFileToRecover = i;
 				countOfFilesMatched++;
@@ -333,16 +383,18 @@ int main(int argc, char* argv[]) {
 		if (sha1Chosen) {
 			_Bool matchFound = false;
 			for (int i = 0; i < numEntries; ++i) {
+				if (RootDir[i]->DIR_Name[0] != 229)
+					continue;
 				if (strncmp(RootDir[i]->DIR_Name + 1, recoverFile + 1, 10) == 0) {
 					//Found an ambiguous file
 					//Compute size of bytes to read.
-					int clustersOcc = (RootDir[i]->DIR_FileSize + ((BootInfo.BPB_BytsPerSec * BootInfo.BPB_SecPerClus) -1 )) / (BootInfo.BPB_BytsPerSec * BootInfo.BPB_SecPerClus); //is this needed?
-					char sha1Sum[20];
+					int clustersOcc = (RootDir[i]->DIR_FileSize + ((BootInfo.BPB_BytsPerSec * BootInfo.BPB_SecPerClus) - 1)) / (BootInfo.BPB_BytsPerSec * BootInfo.BPB_SecPerClus); //is this needed?
+					unsigned char sha1Sum[20];
 					//Calculate where cluster data is in bytes
 					int startClus = RootDir[i]->DIR_FstClusLO + (RootDir[i]->DIR_FstClusHI << 16);
 					SHA1(fatDisk + ((startClus - 2) * BootInfo.BPB_SecPerClus * BootInfo.BPB_BytsPerSec) + dataArea, RootDir[i]->DIR_FileSize, sha1Sum);
 
-					char sha1ValHex[20];
+					unsigned char sha1ValHex[20];
 					//Decode ascii hex string into hex array of 2 ascii letters for 1 byte
 					for (int i = 0, k = 0; k < 40; k += 2, ++i) {
 						sha1ValHex[i] = hex2byte(sha1Value + k);
@@ -354,6 +406,8 @@ int main(int argc, char* argv[]) {
 					//		matchFound = false;
 					//	}
 					//}
+					//printf("Sha1 provided: %s\n", sha1ValHex);
+					//printf("Sha1 found at: %s\n", sha1Sum);
 					if (strncmp(sha1Sum, sha1ValHex, 20) == 0)
 						matchFound = true;
 					if (matchFound) {
@@ -369,22 +423,20 @@ int main(int argc, char* argv[]) {
 		}
 
 		//Change e5 to first letter
-		fatDisk[rootDirData + (32*indexOfFileToRecover)] = fileToRecover[0];
+		fatDisk[RootDir[indexOfFileToRecover]->DIR_ActualStart] = fileToRecover[0];
 		//File found now, recover it
 		//To recover a small file that spans the size of one cluster change starting cluster to EOC
-		//First fat is after reserved data (every other fat is nth FAT(FAT SIZE) + 1st FAT start plus
-		int FirstFatStart = (BootInfo.BPB_RsvdSecCnt * BootInfo.BPB_BytsPerSec);
-		//First 12 bytes are reserved? Multiply cluster number by 4 to get byte location in FAT
+		//First 8 bytes are reserved? Multiply cluster number by 4 to get byte location in FAT
 		int startingCluster = RootDir[indexOfFileToRecover]->DIR_FstClusLO + (RootDir[indexOfFileToRecover]->DIR_FstClusHI << 16);
 
-		if(startingCluster != 0){
-		//If there is a starting cluster, update FATs, if not dont update and return file update successful. DIR entry updated
-		
-		int clustersOccupied = (RootDir[indexOfFileToRecover]->DIR_FileSize + ((BootInfo.BPB_BytsPerSec * BootInfo.BPB_SecPerClus) - 1)) / (BootInfo.BPB_BytsPerSec * BootInfo.BPB_SecPerClus);
-		
-		//IF FILE IS ONLY 1 CLUSTER LONG DO THIS
+		if (startingCluster != 0) {
+			//If there is a starting cluster, update FATs, if not dont update and return file update successful. DIR entry updated
+
+			int clustersOccupied = (RootDir[indexOfFileToRecover]->DIR_FileSize + ((BootInfo.BPB_BytsPerSec * BootInfo.BPB_SecPerClus) - 1)) / (BootInfo.BPB_BytsPerSec * BootInfo.BPB_SecPerClus);
+
+			//IF FILE IS ONLY 1 CLUSTER LONG DO THIS
 			if (clustersOccupied == 1) {
-				int bytesToChange = startingCluster * 4;
+				unsigned int bytesToChange = startingCluster * 4;
 				for (int j = 0; j < BootInfo.BPB_NumFATs; ++j) {
 					for (int i = 0; i < 3; ++i) {
 						fatDisk[(j * BootInfo.BPB_FATSz32 * BootInfo.BPB_BytsPerSec) + FirstFatStart + bytesToChange + i] = 255;
@@ -393,18 +445,18 @@ int main(int argc, char* argv[]) {
 				}
 			}
 			else {
-		//FILE IS MORE THAN ONE CLUSTER!!
-				//How many clusters does this thing span?
-				//Divide file size by bytes per cluster (cluster may have more than one sector)
-				//Go through FATs and change cluster sequences
+				//FILE IS MORE THAN ONE CLUSTER!!
+						//How many clusters does this thing span?
+						//Divide file size by bytes per cluster (cluster may have more than one sector)
+						//Go through FATs and change cluster sequences
 				for (int j = 0; j < BootInfo.BPB_NumFATs; ++j) {
 					for (int k = 0; k < clustersOccupied; ++k) {
 						//Change each cluster in a FAT
 						//Convert next cluster number to little endian format
-						if(k+1 == clustersOccupied)
-							writeIntToDisk(268435455, fatDisk, (j * BootInfo.BPB_FATSz32 * BootInfo.BPB_BytsPerSec) + FirstFatStart + (startingCluster+k) * 4);
+						if (k + 1 == clustersOccupied)
+							writeIntToDisk(268435455, fatDisk, (j * BootInfo.BPB_FATSz32 * BootInfo.BPB_BytsPerSec) + FirstFatStart + (startingCluster + k) * 4);
 						else
-							writeIntToDisk(startingCluster + k+1, fatDisk, (j* BootInfo.BPB_FATSz32* BootInfo.BPB_BytsPerSec) + FirstFatStart + (startingCluster+k)*4);
+							writeIntToDisk(startingCluster + k + 1, fatDisk, (j * BootInfo.BPB_FATSz32 * BootInfo.BPB_BytsPerSec) + FirstFatStart + (startingCluster + k) * 4);
 					}
 				}
 			}
@@ -416,6 +468,25 @@ int main(int argc, char* argv[]) {
 			printf("%s: successfully recovered\n", fileToRecover);
 	}
 
+	//MILESTONE 8
+	//BIG BOI
+	if (recNonContigChosen) {
+		//Call dfs from 2 -> 11, with starting cluster being 2 -> 11
+		for (int i = 0; i < 8; ++i) {
+			//malloc a char array equal to size of 8 clusters
+			char* fileToCheck = malloc(clusterSizeInBytes * 8);
+
+			//Call DFS
+
+
+			free(fileToCheck);
+		}
+	}
+	return 0;
+}
+//u is starting cluster, and will then go up to 11
+_Bool DFS(unsigned int u, char* checkedCluster, unsigned char sha1CheckSum[], _Bool visted[]) {
+	visted[u] = true;
 
 	return 0;
 }
