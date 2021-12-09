@@ -68,6 +68,7 @@ void fail() {
 	printf("Usage: ./nyufile disk <options>\n  -i                     Print the file system information.\n  -l                     List the root directory.\n  -r filename [-s sha1]  Recover a contiguous file.\n  -R filename -s sha1    Recover a possibly non-contiguous file.\n");
 	exit(1);
 }
+//Custom write to disk function that writes any unsigned int to little endian format
 void writeIntToDisk(unsigned int Num, char* diskToWrite, int byteOffset) {
 
 	unsigned char num[8];
@@ -94,42 +95,24 @@ void writeIntToDisk(unsigned int Num, char* diskToWrite, int byteOffset) {
 void DFS(unsigned int u, unsigned int* path, char* checkedCluster, _Bool* visted, int pathIndex, char* fatDiskCpy, BootEntry Boot, DirEntry** Directory, unsigned int dataStart, int indexOfFile, unsigned char sha1Val[], unsigned int* path2, unsigned int firstFatStart, unsigned int fileSize, char* fileToRec, _Bool *pF) {
 	visted[u] = true;
 	path[pathIndex++] = u;
-	//for (int i = 0; i < 8; ++i) {
-	//	printf("%i", visted[i]);
-	//}
-	//printf("\n");
 	//add u to the checkcluster array
 	unsigned int clusterStart = (u)*Boot.BPB_SecPerClus * Boot.BPB_BytsPerSec;
-	//memcpy(checkedCluster+ (pathIndex* Boot.BPB_SecPerClus * Boot.BPB_BytsPerSec), fatDiskCpy + dataStart + clusterStart, Boot.BPB_SecPerClus * Boot.BPB_BytsPerSec);
 	strncat(checkedCluster, fatDiskCpy + dataStart + clusterStart, Boot.BPB_SecPerClus * Boot.BPB_BytsPerSec);
-	//printf("Checkcluster: %s\n", checkedCluster);
-	//printf("New check\n");
 	//check if sha1sum matches
 	unsigned char sha1Sum[20];
 	SHA1(checkedCluster, Directory[indexOfFile]->DIR_FileSize, sha1Sum);
-	//for (int i = 0; i < 8; ++i) {
-	//	printf("%i", path[i] + 2);
-	//}
-	//printf("\n");
-	//printf("Sha1: %s\n", sha1Sum);
+
 	if (strncmp(sha1Sum, sha1Val, 20) == 0) {
 		_Bool found = true;
 		unsigned int checkNum = 0;
-		//printf("Clusters occupied: %i\n", fileSize);
-		//printf("fatstart: %i\n", firstFatStart);
-		//printf("first cluster: %i\n", path[0]);
-		//printf("fatstart first cluster to search: %i\n", (path[0] + 2) * 4);
+
 		for (int i = 0; i < fileSize; ++i) {
 			checkNum = fatDiskCpy[firstFatStart + ((path[i] + 2) * 4)] + (fatDiskCpy[firstFatStart + ((path[i] + 2) * 4) + 1] << 8) + (fatDiskCpy[firstFatStart + ((path[i] + 2) * 4) + 2] << 16) + (fatDiskCpy[firstFatStart + ((path[i] + 2) * 4) + 3] << 24);
-			//printf("checknum: %i\n", checkNum);
 			if (checkNum != 0)
 				found = false;
 		}
 		
 		if (found) {
-			//for (int i = 0; i < fileSize; ++i) {
-			//	printf("Path found: %i\n", path[i] + 2);
-			//}
 			//Recover the file
 			fatDiskCpy[Directory[indexOfFile]->DIR_ActualStart] = fileToRec[0];
 			for (int i = 0; i < Boot.BPB_NumFATs; ++i) {
@@ -139,17 +122,14 @@ void DFS(unsigned int u, unsigned int* path, char* checkedCluster, _Bool* visted
 						writeIntToDisk(268435455, fatDiskCpy, (i * Boot.BPB_FATSz32 * Boot.BPB_BytsPerSec) + firstFatStart + ((path[k] + 2) * 4));
 					else
 						writeIntToDisk((path[k+1]+2), fatDiskCpy, (i * Boot.BPB_FATSz32 * Boot.BPB_BytsPerSec) + firstFatStart + ((path[k] + 2) * 4));
-
 				}
 			}
 			*pF = true;
 			printf("%s: successfully recovered with SHA-1\n", fileToRec);
-			//printf("Checkcluster: %s\n", checkedCluster);
 		}
-		//return;
 	}
 	else {
-		for (int i = 0; i < 8; i++) {
+		for (int i = 0; i < 10; i++) {
 			if (visted[i] != true)
 				DFS(i, path, checkedCluster, visted, pathIndex, fatDiskCpy, Boot, Directory, dataStart, indexOfFile, sha1Val, path2, firstFatStart, fileSize, fileToRec, pF);
 		}
@@ -158,15 +138,11 @@ void DFS(unsigned int u, unsigned int* path, char* checkedCluster, _Bool* visted
 	visted[u] = false;
 	//move pointer of checked cluster back
 	int size = pathIndex * Boot.BPB_SecPerClus * Boot.BPB_BytsPerSec;
-	//printf("size: %i\n", size);
 	path[pathIndex] = 0;
 	pathIndex--;
-	//printf("size: %i\n", size);
 	checkedCluster[size - Boot.BPB_SecPerClus * Boot.BPB_BytsPerSec] = '\0';
-
-	//return;
 }
-
+//Only outside reference
 //Reference: https://stackoverflow.com/questions/25748791/how-to-form-an-asciihex-number-using-2-chars
 //Reference only for how to hex decode a string literal
 char hex2byte(char* hs)
@@ -188,7 +164,7 @@ char hex2byte(char* hs)
 
 	b = (nibbles[0] << 4) | nibbles[1];
 	return b;
-}
+}//END Reference
 
 int main(int argc, char* argv[]) {
 	_Bool noOption = true;
@@ -281,31 +257,21 @@ int main(int argc, char* argv[]) {
 	//in order of 45 44 47 46
 
 	BootInfo.BPB_RootClus = fatDisk[44] + (fatDisk[45] << 8) + (fatDisk[46] << 16) + (fatDisk[47] << 24);
-	//printf("root cluster is at: %i\n", BootInfo.BPB_RootClus);
 	BootInfo.BPB_FATSz32 = fatDisk[36] + (fatDisk[37] << 8) + (fatDisk[38] << 16) + (fatDisk[39] << 24);
-	//printf("Fat size in sectors: %i\n", BootInfo.BPB_FATSz32);
 	unsigned int dataArea = (BootInfo.BPB_RsvdSecCnt * BootInfo.BPB_BytsPerSec) + ((BootInfo.BPB_NumFATs * BootInfo.BPB_FATSz32) * BootInfo.BPB_BytsPerSec);
-	//printf("Data area starts at byte: %i\n", dataArea);
 	//Do some math to find where root directory is
 	unsigned int rootDirData = ((BootInfo.BPB_RootClus - 2) * BootInfo.BPB_SecPerClus) * BootInfo.BPB_BytsPerSec + dataArea;
 	//First fat is after reserved data (every other fat is nth FAT(FAT SIZE) + 1st FAT start plus
 	unsigned int FirstFatStart = (BootInfo.BPB_RsvdSecCnt * BootInfo.BPB_BytsPerSec);
 	//Size of a cluster in bytes is:
 	int clusterSizeInBytes = BootInfo.BPB_SecPerClus * BootInfo.BPB_BytsPerSec;
-	//printf("Root directory starts at: %i\n", rootDirData);
 	//Read directory 
 	//Loop through directory and find number of entries
 	unsigned int i = rootDirData;
-	//while (fatDisk[i] != 0) {//Goes till end of cluster --------------------------------CHANGE TO REPRESENT ACTUAL FILE COUNT
-	//	numEntries++;
-	//	i += 32;
-	//}
 	int numEntries = (BootInfo.BPB_FATSz32 * BootInfo.BPB_BytsPerSec) / 32; //WILL INCLUDE "DELETED" FILES
 	DirEntry** RootDir = malloc(sizeof(DirEntry*) * numEntries);
-	i = rootDirData;
 	int j = 0;
 	unsigned int previousCluster = BootInfo.BPB_RootClus;
-	//printf("previous cluster: %i\n", previousCluster);
 	int numLessThanClusterSize = 0;
 	numEntries = 0;
 	while (numLessThanClusterSize < clusterSizeInBytes + 1) { //Goes till end of cluster
@@ -315,20 +281,15 @@ int main(int argc, char* argv[]) {
 			break;
 		}
 		if (numLessThanClusterSize >= clusterSizeInBytes) { //if root dir spans across multiple clusters, go back to fat disk and make i the new offest
-			//fprintf(stderr, "Previous cluster, fatDisk at: %i\n", previousCluster);
 			//Check if previous clustersize is FFFFFF0F
-			//checks if the second byte of the name is 0a
 			//go back to FAT to get next cluster
 			unsigned int k = FirstFatStart + (previousCluster * 4);
-			//printf("k: %i\n", k);
 			unsigned int nextCluster = fatDisk[k] + (fatDisk[k + 1] << 8) + (fatDisk[k + 2] << 16) + (fatDisk[k + 3] << 24);
-			//fprintf(stderr, "Found new cluster, fatDisk at: %i\n", nextCluster);
 			if (nextCluster >= 250000000)
 				break;
 			previousCluster = nextCluster;
 			//set i to where next cluster is
 			i = ((nextCluster - 2) * BootInfo.BPB_SecPerClus) * BootInfo.BPB_BytsPerSec + dataArea;
-			//printf("%i\n", i);
 			numLessThanClusterSize = 0;
 		}
 		RootDir[j] = malloc(sizeof(DirEntry));
@@ -337,7 +298,6 @@ int main(int argc, char* argv[]) {
 		RootDir[j]->DIR_FileSize = fatDisk[i + 28] + (fatDisk[i + 29] << 8) + (fatDisk[i + 30] << 16) + (fatDisk[i + 31] << 24);
 		RootDir[j]->DIR_FstClusLO = fatDisk[i + 26] + (fatDisk[i + 27] << 8);
 		RootDir[j]->DIR_FstClusHI = fatDisk[i + 20] + (fatDisk[i + 21] << 8);
-		//int startingCluster = fatDisk[i + 26] + (fatDisk[i + 27] << 8) + (fatDisk[i + 20] << 16) + (fatDisk[i + 21] << 24);
 		RootDir[j]->DIR_ActualStart = i; //where i is the actual byte location of each directory entry starting point !!!Useful for changing e5 to letter!!!
 		j++;
 		i += 32;
@@ -431,8 +391,6 @@ int main(int argc, char* argv[]) {
 				recoverFile[i] = ' ';
 			}
 		}
-		//printf("file to recover: %s\n", fileToRecover);
-		//printf("recoverFile: %s\n", recoverFile);
 		//go through root directory and see if file can be found
 		int indexOfFileToRecover;
 		int countOfFilesMatched = 0;
@@ -440,7 +398,6 @@ int main(int argc, char* argv[]) {
 			if (RootDir[i]->DIR_Name[0] != 229)
 				continue;
 			if (strncmp(RootDir[i]->DIR_Name + 1, recoverFile + 1, 10) == 0) {
-				//printf("File found\n");
 				indexOfFileToRecover = i;
 				countOfFilesMatched++;
 			}
@@ -475,16 +432,7 @@ int main(int argc, char* argv[]) {
 					//Calculate where cluster data is in bytes
 					int startClus = RootDir[i]->DIR_FstClusLO + (RootDir[i]->DIR_FstClusHI << 16);
 					SHA1(fatDisk + ((startClus - 2) * BootInfo.BPB_SecPerClus * BootInfo.BPB_BytsPerSec) + dataArea, RootDir[i]->DIR_FileSize, sha1Sum);
-
 					//Check if entry is the one specified
-					//for (int j = 0; j < 20; ++j) {
-					//	if (sha1Sum[j] != sha1ValHex[j]) {
-					//		printf("Orig: %c Decoded %c\n", sha1Sum[j], sha1ValHex[j]);
-					//		matchFound = false;
-					//	}
-					//}
-					//printf("Sha1 provided: %s\n", sha1ValHex);
-					//printf("Sha1 found at: %s\n", sha1Sum);
 					if (strncmp(sha1Sum, sha1ValHex, 20) == 0)
 						matchFound = true;
 					if (matchFound) {
@@ -500,20 +448,15 @@ int main(int argc, char* argv[]) {
 		}
 		int startingCluster = RootDir[indexOfFileToRecover]->DIR_FstClusLO + (RootDir[indexOfFileToRecover]->DIR_FstClusHI << 16);
 		int clustersOccupied = (RootDir[indexOfFileToRecover]->DIR_FileSize + ((BootInfo.BPB_BytsPerSec * BootInfo.BPB_SecPerClus) - 1)) / (BootInfo.BPB_BytsPerSec * BootInfo.BPB_SecPerClus);
-		//printf("starting cluster: %i\n", startingCluster);
 		if (recNonContigChosen) {
 			//MILESTONE 8
 			//BIG BOI
-
 			//Call dfs from 2 -> 11, with starting cluster being 2 -> 11
-			unsigned int path[8];
-			char* fileToCheck = malloc(clusterSizeInBytes * 8);
-			unsigned int pathFound[8]; //= false;
+			unsigned int path[10];
+			char* fileToCheck = malloc(clusterSizeInBytes * 10);
+			unsigned int pathFound[10];
 			_Bool pFound = false;
-
-			//for (int i = 0; i < 8; ++i) {
-				//malloc a char array equal to size of 8 clusters
-			_Bool visitedPath[8];
+			_Bool visitedPath[10];
 			int l = 0;
 			//Call DFS
 			if (clustersOccupied != 0) {
@@ -526,16 +469,7 @@ int main(int argc, char* argv[]) {
 				fatDisk[RootDir[indexOfFileToRecover]->DIR_ActualStart] = fileToRecover[0];
 				printf("%s: successfully recovered with SHA-1\n", fileToRecover);
 			}
-			//printf("size of filetocheck: %i\n", sizeof(fileToCheck) / sizeof(char));
-			//free(fileToCheck);
-		//}
-		//printf("%s\n",fileToCheck);
-		//for (int i = 0; i < 8; ++i) {
-		//	printf("Path: %i\n", path[i]);
-		//}
-		//for (int i = 0; i < 8; ++i) {
-		//	printf("Path2: %i\n", Path2[i]);
-		//}
+			free(fileToCheck);
 		}
 		else {
 			//Change e5 to first letter
@@ -543,11 +477,8 @@ int main(int argc, char* argv[]) {
 			//File found now, recover it
 			//To recover a small file that spans the size of one cluster change starting cluster to EOC
 			//First 8 bytes are reserved? Multiply cluster number by 4 to get byte location in FAT
-
 			if (startingCluster != 0) {
 				//If there is a starting cluster, update FATs, if not dont update and return file update successful. DIR entry updated
-
-
 				//IF FILE IS ONLY 1 CLUSTER LONG DO THIS
 				if (clustersOccupied == 1) {
 					unsigned int bytesToChange = startingCluster * 4;
@@ -582,7 +513,6 @@ int main(int argc, char* argv[]) {
 				printf("%s: successfully recovered\n", fileToRecover);
 		}
 	}
-
 	if (recNonContigChosen) {
 	}
 	return 0;
