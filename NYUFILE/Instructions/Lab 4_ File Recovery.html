@@ -1,0 +1,1164 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<!-- saved from url=(0085)https://cs.nyu.edu/courses/fall21/CSCI-GA.2250-002/nyufile#workingwithafat32diskimage -->
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lab 4: File Recovery</title>
+<meta name="generator" content="Org Mode">
+<style type="text/css">
+ <!--/*--><![CDATA[/*><!--*/
+  .title  { text-align: center;
+             margin-bottom: .2em; }
+  .subtitle { text-align: center;
+              font-size: medium;
+              font-weight: bold;
+              margin-top:0; }
+  .todo   { font-family: monospace; color: red; }
+  .done   { font-family: monospace; color: green; }
+  .priority { font-family: monospace; color: orange; }
+  .tag    { background-color: #eee; font-family: monospace;
+            padding: 2px; font-size: 80%; font-weight: normal; }
+  .timestamp { color: #bebebe; }
+  .timestamp-kwd { color: #5f9ea0; }
+  .org-right  { margin-left: auto; margin-right: 0px;  text-align: right; }
+  .org-left   { margin-left: 0px;  margin-right: auto; text-align: left; }
+  .org-center { margin-left: auto; margin-right: auto; text-align: center; }
+  .underline { text-decoration: underline; }
+  #postamble p, #preamble p { font-size: 90%; margin: .2em; }
+  p.verse { margin-left: 3%; }
+  pre {
+    border: 1px solid #ccc;
+    box-shadow: 3px 3px 3px #eee;
+    padding: 8pt;
+    font-family: monospace;
+    overflow: auto;
+    margin: 1.2em;
+  }
+  pre.src {
+    position: relative;
+    overflow: auto;
+    padding-top: 1.2em;
+  }
+  pre.src:before {
+    display: none;
+    position: absolute;
+    background-color: white;
+    top: -10px;
+    right: 10px;
+    padding: 3px;
+    border: 1px solid black;
+  }
+  pre.src:hover:before { display: inline; margin-top: 14px;}
+  /* Languages per Org manual */
+  pre.src-asymptote:before { content: 'Asymptote'; }
+  pre.src-awk:before { content: 'Awk'; }
+  pre.src-C:before { content: 'C'; }
+  /* pre.src-C++ doesn't work in CSS */
+  pre.src-clojure:before { content: 'Clojure'; }
+  pre.src-css:before { content: 'CSS'; }
+  pre.src-D:before { content: 'D'; }
+  pre.src-ditaa:before { content: 'ditaa'; }
+  pre.src-dot:before { content: 'Graphviz'; }
+  pre.src-calc:before { content: 'Emacs Calc'; }
+  pre.src-emacs-lisp:before { content: 'Emacs Lisp'; }
+  pre.src-fortran:before { content: 'Fortran'; }
+  pre.src-gnuplot:before { content: 'gnuplot'; }
+  pre.src-haskell:before { content: 'Haskell'; }
+  pre.src-hledger:before { content: 'hledger'; }
+  pre.src-java:before { content: 'Java'; }
+  pre.src-js:before { content: 'Javascript'; }
+  pre.src-latex:before { content: 'LaTeX'; }
+  pre.src-ledger:before { content: 'Ledger'; }
+  pre.src-lisp:before { content: 'Lisp'; }
+  pre.src-lilypond:before { content: 'Lilypond'; }
+  pre.src-lua:before { content: 'Lua'; }
+  pre.src-matlab:before { content: 'MATLAB'; }
+  pre.src-mscgen:before { content: 'Mscgen'; }
+  pre.src-ocaml:before { content: 'Objective Caml'; }
+  pre.src-octave:before { content: 'Octave'; }
+  pre.src-org:before { content: 'Org mode'; }
+  pre.src-oz:before { content: 'OZ'; }
+  pre.src-plantuml:before { content: 'Plantuml'; }
+  pre.src-processing:before { content: 'Processing.js'; }
+  pre.src-python:before { content: 'Python'; }
+  pre.src-R:before { content: 'R'; }
+  pre.src-ruby:before { content: 'Ruby'; }
+  pre.src-sass:before { content: 'Sass'; }
+  pre.src-scheme:before { content: 'Scheme'; }
+  pre.src-screen:before { content: 'Gnu Screen'; }
+  pre.src-sed:before { content: 'Sed'; }
+  pre.src-sh:before { content: 'shell'; }
+  pre.src-sql:before { content: 'SQL'; }
+  pre.src-sqlite:before { content: 'SQLite'; }
+  /* additional languages in org.el's org-babel-load-languages alist */
+  pre.src-forth:before { content: 'Forth'; }
+  pre.src-io:before { content: 'IO'; }
+  pre.src-J:before { content: 'J'; }
+  pre.src-makefile:before { content: 'Makefile'; }
+  pre.src-maxima:before { content: 'Maxima'; }
+  pre.src-perl:before { content: 'Perl'; }
+  pre.src-picolisp:before { content: 'Pico Lisp'; }
+  pre.src-scala:before { content: 'Scala'; }
+  pre.src-shell:before { content: 'Shell Script'; }
+  pre.src-ebnf2ps:before { content: 'ebfn2ps'; }
+  /* additional language identifiers per "defun org-babel-execute"
+       in ob-*.el */
+  pre.src-cpp:before  { content: 'C++'; }
+  pre.src-abc:before  { content: 'ABC'; }
+  pre.src-coq:before  { content: 'Coq'; }
+  pre.src-groovy:before  { content: 'Groovy'; }
+  /* additional language identifiers from org-babel-shell-names in
+     ob-shell.el: ob-shell is the only babel language using a lambda to put
+     the execution function name together. */
+  pre.src-bash:before  { content: 'bash'; }
+  pre.src-csh:before  { content: 'csh'; }
+  pre.src-ash:before  { content: 'ash'; }
+  pre.src-dash:before  { content: 'dash'; }
+  pre.src-ksh:before  { content: 'ksh'; }
+  pre.src-mksh:before  { content: 'mksh'; }
+  pre.src-posh:before  { content: 'posh'; }
+  /* Additional Emacs modes also supported by the LaTeX listings package */
+  pre.src-ada:before { content: 'Ada'; }
+  pre.src-asm:before { content: 'Assembler'; }
+  pre.src-caml:before { content: 'Caml'; }
+  pre.src-delphi:before { content: 'Delphi'; }
+  pre.src-html:before { content: 'HTML'; }
+  pre.src-idl:before { content: 'IDL'; }
+  pre.src-mercury:before { content: 'Mercury'; }
+  pre.src-metapost:before { content: 'MetaPost'; }
+  pre.src-modula-2:before { content: 'Modula-2'; }
+  pre.src-pascal:before { content: 'Pascal'; }
+  pre.src-ps:before { content: 'PostScript'; }
+  pre.src-prolog:before { content: 'Prolog'; }
+  pre.src-simula:before { content: 'Simula'; }
+  pre.src-tcl:before { content: 'tcl'; }
+  pre.src-tex:before { content: 'TeX'; }
+  pre.src-plain-tex:before { content: 'Plain TeX'; }
+  pre.src-verilog:before { content: 'Verilog'; }
+  pre.src-vhdl:before { content: 'VHDL'; }
+  pre.src-xml:before { content: 'XML'; }
+  pre.src-nxml:before { content: 'XML'; }
+  /* add a generic configuration mode; LaTeX export needs an additional
+     (add-to-list 'org-latex-listings-langs '(conf " ")) in .emacs */
+  pre.src-conf:before { content: 'Configuration File'; }
+
+  table { border-collapse:collapse; }
+  caption.t-above { caption-side: top; }
+  caption.t-bottom { caption-side: bottom; }
+  td, th { vertical-align:top;  }
+  th.org-right  { text-align: center;  }
+  th.org-left   { text-align: center;   }
+  th.org-center { text-align: center; }
+  td.org-right  { text-align: right;  }
+  td.org-left   { text-align: left;   }
+  td.org-center { text-align: center; }
+  dt { font-weight: bold; }
+  .footpara { display: inline; }
+  .footdef  { margin-bottom: 1em; }
+  .figure { padding: 1em; }
+  .figure p { text-align: center; }
+  .equation-container {
+    display: table;
+    text-align: center;
+    width: 100%;
+  }
+  .equation {
+    vertical-align: middle;
+  }
+  .equation-label {
+    display: table-cell;
+    text-align: right;
+    vertical-align: middle;
+  }
+  .inlinetask {
+    padding: 10px;
+    border: 2px solid gray;
+    margin: 10px;
+    background: #ffffcc;
+  }
+  #org-div-home-and-up
+   { text-align: right; font-size: 70%; white-space: nowrap; }
+  textarea { overflow-x: auto; }
+  .linenr { font-size: smaller }
+  .code-highlighted { background-color: #ffff00; }
+  .org-info-js_info-navigation { border-style: none; }
+  #org-info-js_console-label
+    { font-size: 10px; font-weight: bold; white-space: nowrap; }
+  .org-info-js_search-highlight
+    { background-color: #ffff00; color: #000000; font-weight: bold; }
+  .org-svg { width: 90%; }
+  /*]]>*/-->
+</style>
+<link rel="stylesheet" type="text/css" href="./Lab 4_ File Recovery_files/htmlize.css">
+<link rel="stylesheet" type="text/css" href="./Lab 4_ File Recovery_files/readtheorg.css">
+<script src="./Lab 4_ File Recovery_files/jquery.min.js.download"></script><style></style>
+<script src="./Lab 4_ File Recovery_files/bootstrap.min.js.download"></script>
+<script type="text/javascript" src="./Lab 4_ File Recovery_files/jquery.stickytableheaders.min.js.download"></script>
+<script type="text/javascript" src="./Lab 4_ File Recovery_files/readtheorg.js.download"></script>
+<style>pre.src{background:#fafafa;color:#383a42;}</style>
+<script type="text/javascript">
+// @license magnet:?xt=urn:btih:e95b018ef3580986a04669f1b5879592219e2a7a&dn=public-domain.txt Public Domain
+<!--/*--><![CDATA[/*><!--*/
+     function CodeHighlightOn(elem, id)
+     {
+       var target = document.getElementById(id);
+       if(null != target) {
+         elem.classList.add("code-highlighted");
+         target.classList.add("code-highlighted");
+       }
+     }
+     function CodeHighlightOff(elem, id)
+     {
+       var target = document.getElementById(id);
+       if(null != target) {
+         elem.classList.remove("code-highlighted");
+         target.classList.remove("code-highlighted");
+       }
+     }
+    /*]]>*///-->
+// @license-end
+</script>
+<script async="" src="./Lab 4_ File Recovery_files/adblocker-chromeglobalinjectjs.js.download"></script></head>
+<body>
+<div id="content"><div id="toggle-sidebar"><a href="https://cs.nyu.edu/courses/fall21/CSCI-GA.2250-002/nyufile#table-of-contents"><h2>Table of Contents</h2></a></div>
+<h1 class="title">Lab 4: File Recovery</h1>
+<div id="table-of-contents">
+<h2>Table of Contents<a class="close-sidebar" href="https://cs.nyu.edu/courses/fall21/CSCI-GA.2250-002/nyufile#">Close</a></h2>
+<div id="text-table-of-contents">
+<ul class="nav">
+<li class=""><a href="https://cs.nyu.edu/courses/fall21/CSCI-GA.2250-002/nyufile#introduction">Introduction</a></li>
+<li class=""><a href="https://cs.nyu.edu/courses/fall21/CSCI-GA.2250-002/nyufile#objectives">Objectives</a></li>
+<li class=""><a href="https://cs.nyu.edu/courses/fall21/CSCI-GA.2250-002/nyufile#overview">Overview</a></li>
+<li class=""><a href="https://cs.nyu.edu/courses/fall21/CSCI-GA.2250-002/nyufile#preparation">Preparation</a>
+<ul>
+<li class=""><a href="https://cs.nyu.edu/courses/fall21/CSCI-GA.2250-002/nyufile#ifyourmachinehasanintelcpu">If your machine has an Intel CPU…</a></li>
+<li class=""><a href="https://cs.nyu.edu/courses/fall21/CSCI-GA.2250-002/nyufile#ifyouhaveamacwithanm1cpu">If you have a Mac with an M1 CPU…</a></li>
+</ul>
+</li>
+<li class=""><a href="https://cs.nyu.edu/courses/fall21/CSCI-GA.2250-002/nyufile#workingwithafat32diskimage">Working with a FAT32 disk image</a>
+<ul>
+<li class=""><a href="https://cs.nyu.edu/courses/fall21/CSCI-GA.2250-002/nyufile#step1createanemptyfileofacertainsize">Step 1: create an empty file of a certain size</a></li>
+<li class=""><a href="https://cs.nyu.edu/courses/fall21/CSCI-GA.2250-002/nyufile#step2formatthediskwithfat32">Step 2: format the disk with FAT32</a></li>
+<li class=""><a href="https://cs.nyu.edu/courses/fall21/CSCI-GA.2250-002/nyufile#step3verifythefilesysteminformation">Step 3: verify the file system information</a></li>
+<li class=""><a href="https://cs.nyu.edu/courses/fall21/CSCI-GA.2250-002/nyufile#step4mountthefilesystem">Step 4: mount the file system</a></li>
+<li class=""><a href="https://cs.nyu.edu/courses/fall21/CSCI-GA.2250-002/nyufile#step5playwiththefilesystem">Step 5: play with the file system</a></li>
+<li><a href="https://cs.nyu.edu/courses/fall21/CSCI-GA.2250-002/nyufile#step6unmountthefilesystem">Step 6: unmount the file system</a></li>
+<li><a href="https://cs.nyu.edu/courses/fall21/CSCI-GA.2250-002/nyufile#step7examinethefilesystem">Step 7: examine the file system</a></li>
+</ul>
+</li>
+<li class=""><a href="https://cs.nyu.edu/courses/fall21/CSCI-GA.2250-002/nyufile#yourtasks">Your tasks</a>
+<ul>
+<li><a href="https://cs.nyu.edu/courses/fall21/CSCI-GA.2250-002/nyufile#milestone1validateusage">Milestone 1: validate usage</a></li>
+<li><a href="https://cs.nyu.edu/courses/fall21/CSCI-GA.2250-002/nyufile#milestone2printthefilesysteminformation">Milestone 2: print the file system information</a></li>
+<li><a href="https://cs.nyu.edu/courses/fall21/CSCI-GA.2250-002/nyufile#milestone3listtherootdirectory">Milestone 3: list the root directory</a></li>
+<li><a href="https://cs.nyu.edu/courses/fall21/CSCI-GA.2250-002/nyufile#milestone4recoverasmallfile">Milestone 4: recover a small file</a></li>
+<li><a href="https://cs.nyu.edu/courses/fall21/CSCI-GA.2250-002/nyufile#milestone5recoveralargecontiguouslyallocatedfile">Milestone 5: recover a large contiguously-allocated file</a></li>
+<li><a href="https://cs.nyu.edu/courses/fall21/CSCI-GA.2250-002/nyufile#milestone6detectambiguousfilerecoveryrequests">Milestone 6: detect ambiguous file recovery requests</a></li>
+<li class=""><a href="https://cs.nyu.edu/courses/fall21/CSCI-GA.2250-002/nyufile#milestone7recoveracontiguouslyallocatedfilewithsha1hash">Milestone 7: recover a contiguously-allocated file with SHA-1 hash</a></li>
+<li class=""><a href="https://cs.nyu.edu/courses/fall21/CSCI-GA.2250-002/nyufile#milestone8recoveranoncontiguouslyallocatedfile">Milestone 8: recover a non-contiguously allocated file</a></li>
+</ul>
+</li>
+<li class=""><a href="https://cs.nyu.edu/courses/fall21/CSCI-GA.2250-002/nyufile#fat32datastructures">FAT32 data structures</a>
+<ul>
+<li class=""><a href="https://cs.nyu.edu/courses/fall21/CSCI-GA.2250-002/nyufile#bootsector">Boot sector</a></li>
+<li class=""><a href="https://cs.nyu.edu/courses/fall21/CSCI-GA.2250-002/nyufile#directoryentry">Directory entry</a></li>
+</ul>
+</li>
+<li class=""><a href="https://cs.nyu.edu/courses/fall21/CSCI-GA.2250-002/nyufile#compiling">Compiling</a></li>
+<li class=""><a href="https://cs.nyu.edu/courses/fall21/CSCI-GA.2250-002/nyufile#testing">Testing</a></li>
+<li class=""><a href="https://cs.nyu.edu/courses/fall21/CSCI-GA.2250-002/nyufile#submission">Submission</a></li>
+<li class=""><a href="https://cs.nyu.edu/courses/fall21/CSCI-GA.2250-002/nyufile#rubric">Rubric</a></li>
+<li class=""><a href="https://cs.nyu.edu/courses/fall21/CSCI-GA.2250-002/nyufile#tips">Tips</a>
+<ul>
+<li><a href="https://cs.nyu.edu/courses/fall21/CSCI-GA.2250-002/nyufile#dontprocrastinate">Don’t procrastinate</a></li>
+<li class=""><a href="https://cs.nyu.edu/courses/fall21/CSCI-GA.2250-002/nyufile#somegeneralhints">Some general hints</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-introduction" class="outline-2">
+<h2 id="introduction">Introduction</h2>
+<div class="outline-text-2" id="text-introduction">
+<p>
+FAT32 has been around for 25 years. Because of its simplicity, it is the most widely compatible file system. Although recent computers have adopted newer file systems, FAT32 is still dominant in SD cards and USB flash drives due to its compatibility.
+</p>
+
+<p>
+Have you ever accidentally deleted a file? Do you know that it could be recovered? In this lab, you will build a FAT32 file recovery tool called <b>Need You to Undelete my FILE</b>, or <code>nyufile</code> for short.
+</p>
+</div>
+</div>
+
+<div id="outline-container-objectives" class="outline-2">
+<h2 id="objectives">Objectives</h2>
+<div class="outline-text-2" id="text-objectives">
+<p>
+Through this lab, you will:
+</p>
+
+<ul class="org-ul">
+<li>Learn the internals of the FAT32 file system.</li>
+<li>Learn how to access and recover files from a raw disk.</li>
+<li>Get a better understanding of key file system concepts.</li>
+<li>Be a better C programmer. Learn how to write code that manipulates data at the byte level and understand the alignment issue.</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-overview" class="outline-2">
+<h2 id="overview">Overview</h2>
+<div class="outline-text-2" id="text-overview">
+<p>
+In this lab, you will work on the data stored in the FAT32 file system <b>directly</b>, without the OS file system support. You will implement a tool that recovers a deleted file specified by the user.
+</p>
+
+<p>
+For simplicity, you can assume that <b>the deleted file is in the root directory.</b> Therefore, you don’t need to search subdirectories.
+</p>
+</div>
+</div>
+
+<div id="outline-container-preparation" class="outline-2">
+<h2 id="preparation">Preparation</h2>
+<div class="outline-text-2" id="text-preparation">
+<p>
+Unfortunately, non-root users cannot mount a file system on the CIMS compute servers. If you want to mount a file system, you have to use your own Linux machine or virtual machine.
+</p>
+
+<p>
+If you do not already have a Linux system installed, you can follow these steps to install a virtual machine running CentOS 7.
+</p>
+</div>
+
+<div id="outline-container-ifyourmachinehasanintelcpu" class="outline-3">
+<h3 id="ifyourmachinehasanintelcpu">If your machine has an Intel CPU…</h3>
+<div class="outline-text-3" id="text-ifyourmachinehasanintelcpu">
+<ol class="org-ol">
+<li>Install <a href="https://www.virtualbox.org/wiki/Downloads">VirtualBox</a>.</li>
+<li>Install <a href="https://www.vagrantup.com/downloads">Vagrant</a>.</li>
+<li><p>
+Install the Vagrant <code>scp</code> plugin, which allows you to transfer files between your host machine and the virtual machine:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-text">   $ vagrant plugin install vagrant-scp
+</pre>
+</div></li>
+
+<li><p>
+Download and extract the <a href="https://cs.nyu.edu/courses/fall21/CSCI-GA.2250-002/centos7.tar.gz">configuration file</a>:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-text">   $ tar xf centos7.tar.gz
+</pre>
+</div></li>
+
+<li><p>
+Start the virtual machine (all Vagrant commands must be run in the <code>centos7</code> directory):
+</p>
+
+<div class="org-src-container">
+<pre class="src src-text">   $ cd centos7
+   $ vagrant up
+</pre>
+</div></li>
+
+<li><p>
+Log into the virtual machine:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-text">   $ vagrant ssh
+</pre>
+</div></li>
+
+<li><p>
+Now, you can work on this lab in the virtual machine. It already has <code>gcc</code>, <code>gdb</code>, and <code>vim</code> installed. If you want to install other packages, you can run this command inside the virtual machine:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-text">   $ sudo yum install &lt;packages&gt;
+</pre>
+</div></li>
+
+<li><p>
+To copy files from your host machine to the virtual machine, run this command on your host machine:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-text">   $ vagrant scp &lt;src&gt; :&lt;dest&gt;
+</pre>
+</div>
+
+<p>
+Conversely, to copy files from the virtual machine to your host machine, run:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-text">   $ vagrant scp :&lt;src&gt; &lt;dest&gt;
+</pre>
+</div></li>
+
+<li><p>
+To pause the virtual machine, run:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-text">   $ vagrant suspend
+</pre>
+</div>
+
+<p>
+To shut down the virtual machine, run:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-text">   $ vagrant halt
+</pre>
+</div></li>
+</ol>
+</div>
+</div>
+
+<div id="outline-container-ifyouhaveamacwithanm1cpu" class="outline-3">
+<h3 id="ifyouhaveamacwithanm1cpu">If you have a Mac with an M1 CPU…</h3>
+<div class="outline-text-3" id="text-ifyouhaveamacwithanm1cpu">
+<p>
+Unfortunately, the virtual machine does not work on a Mac with an M1 CPU. You can run the virtual machine on one of the CIMS <a href="https://cims.nyu.edu/webapps/content/systems/resources/computeservers/">compute servers</a>. VirtualBox and Vagrant are already installed. You just need to load the module:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-text">$ module load vagrant
+</pre>
+</div>
+
+<p>
+Then, follow <a href="https://cs.nyu.edu/courses/fall21/CSCI-GA.2250-002/nyufile#ifyourmachinehasanintelcpu">steps 3–9 above</a>.
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-workingwithafat32diskimage" class="outline-2">
+<h2 id="workingwithafat32diskimage">Working with a FAT32 disk image</h2>
+<div class="outline-text-2" id="text-workingwithafat32diskimage">
+<p>
+Before going through the details of this lab, let’s first create a FAT32 disk image. Follow these steps:
+</p>
+</div>
+
+<div id="outline-container-step1createanemptyfileofacertainsize" class="outline-3">
+<h3 id="step1createanemptyfileofacertainsize">Step 1: create an empty file of a certain size</h3>
+<div class="outline-text-3" id="text-step1createanemptyfileofacertainsize">
+<p>
+On Linux, <code>/dev/zero</code> is a special file that provides as many <code>\0</code> as are read from it. The <code>dd</code> command performs low-level copying of raw data. Therefore, you can use it to generate an arbitrary-size file full of zeros.
+</p>
+
+<p>
+For example, to create a 256KB empty file named <code>fat32.disk</code>:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-text">$ dd if=/dev/zero of=fat32.disk bs=256k count=1
+</pre>
+</div>
+
+<p>
+Read <code>man dd</code> for its usage. You will use this file as the disk image.
+</p>
+</div>
+</div>
+
+<div id="outline-container-step2formatthediskwithfat32" class="outline-3">
+<h3 id="step2formatthediskwithfat32">Step 2: format the disk with FAT32</h3>
+<div class="outline-text-3" id="text-step2formatthediskwithfat32">
+<p>
+You can use the <code>mkfs.fat</code> command to create a FAT32 file system. The most basic usage is:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-text">$ mkfs.fat -F 32 fat32.disk
+</pre>
+</div>
+
+<p>
+You can specify a variety of options. For example:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-text">$ mkfs.fat -F 32 -f 2 -S 512 -s 1 -R 32 fat32.disk
+</pre>
+</div>
+
+<p>
+Here are the meanings of each option:
+</p>
+
+<ul class="org-ul">
+<li><code>-F</code>: type of FAT (FAT12, FAT16, or FAT32).</li>
+<li><code>-f</code>: number of FATs.</li>
+<li><code>-S</code>: number of bytes per sector.</li>
+<li><code>-s</code>: number of sectors per cluster.</li>
+<li><code>-R</code>: number of reserved sectors.</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-step3verifythefilesysteminformation" class="outline-3">
+<h3 id="step3verifythefilesysteminformation">Step 3: verify the file system information</h3>
+<div class="outline-text-3" id="text-step3verifythefilesysteminformation">
+<p>
+The <code>fsck.fat</code> command can check and repair FAT file systems. You can invoke it with <code>-v</code> to see the FAT details. For example:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-text">$ fsck.fat -v fat32.disk
+fsck.fat 3.0.20 (12 Jun 2013)
+fsck.fat 3.0.20 (12 Jun 2013)
+Checking we can access the last sector of the filesystem
+Warning: Filesystem is FAT32 according to fat_length and fat32_length fields,
+  but has only 472 clusters, less than the required minimum of 65525.
+  This may lead to problems on some systems.
+Boot sector contents:
+System ID "mkfs.fat"
+Media byte 0xf8 (hard disk)
+       512 bytes per logical sector
+       512 bytes per cluster
+        32 reserved sectors
+First FAT starts at byte 16384 (sector 32)
+         2 FATs, 32 bit entries
+      2048 bytes per FAT (= 4 sectors)
+Root directory start at cluster 2 (arbitrary size)
+Data area starts at byte 20480 (sector 40)
+       472 data clusters (241664 bytes)
+32 sectors/track, 64 heads
+         0 hidden sectors
+       512 sectors total
+Checking for unused clusters.
+Checking free cluster summary.
+fat32.disk: 0 files, 1/472 clusters
+</pre>
+</div>
+
+<p>
+You can see that there are 2 FATs, 512 bytes per sector, 512 bytes per cluster, and 32 reserved sectors. These numbers match our specified options in Step 2. You can try different options yourself.
+</p>
+</div>
+</div>
+
+<div id="outline-container-step4mountthefilesystem" class="outline-3">
+<h3 id="step4mountthefilesystem">Step 4: mount the file system</h3>
+<div class="outline-text-3" id="text-step4mountthefilesystem">
+<p>
+You can use the <code>mount</code> command to mount a file system to a <b>mount point</b>. The mount point can be any empty directory. For example, you can create one at <code>/mnt/disk</code>:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-text">$ sudo mkdir /mnt/disk
+</pre>
+</div>
+
+<p>
+Then, you can mount <code>fat32.disk</code> at that mount point:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-text">$ sudo mount -o umask=0 fat32.disk /mnt/disk
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-step5playwiththefilesystem" class="outline-3">
+<h3 id="step5playwiththefilesystem">Step 5: play with the file system</h3>
+<div class="outline-text-3" id="text-step5playwiththefilesystem">
+<p>
+After the file system is mounted, you can do whatever you like on it, such as creating files, editing files, or deleting files. In order to avoid the hassle of having <a href="https://en.wikipedia.org/wiki/Long_filename">long filenames</a> in your directory entries, it is recommended that you use only <a href="https://en.wikipedia.org/wiki/8.3_filename">8.3 filenames</a>, which means:
+</p>
+
+<ul class="org-ul">
+<li>The filename contains at most eight characters, followed optionally by a <code>.</code> and at most three more characters.</li>
+<li>The filename contains only <b>uppercase</b> letters, numbers, and the following special characters: <code>! # $ % &amp; ' ( ) - @ ^ _ ` { } ~</code>.</li>
+</ul>
+
+<p>
+For example, you can create a file named <code>HELLO.TXT</code>:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-text">$ echo "Hello, world." &gt; /mnt/disk/HELLO.TXT
+$ mkdir /mnt/disk/DIR
+$ touch /mnt/disk/EMPTY
+</pre>
+</div>
+
+<p>
+For the purpose of this lab, after you write anything to the disk, make sure to <b>flush the file system cache</b> using the <code>sync</code> command:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-text">$ sync
+</pre>
+</div>
+
+<p>
+(Otherwise, if you create a file and immediately delete it, the file may not be written to the disk at all and is unrecoverable.)
+</p>
+</div>
+</div>
+
+<div id="outline-container-step6unmountthefilesystem" class="outline-3">
+<h3 id="step6unmountthefilesystem">Step 6: unmount the file system</h3>
+<div class="outline-text-3" id="text-step6unmountthefilesystem">
+<p>
+When you finish playing with the file system, you can unmount it:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-text">$ sudo umount /mnt/disk
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-step7examinethefilesystem" class="outline-3">
+<h3 id="step7examinethefilesystem">Step 7: examine the file system</h3>
+<div class="outline-text-3" id="text-step7examinethefilesystem">
+<p>
+You can examine the file system using the <code>xxd</code> command. You can specify a range using the <code>-s</code> (starting offset) and <code>-l</code> (length) options.
+</p>
+
+<p>
+For example, to examine the root directory:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-text">$ xxd -s 20480 -l 96 fat32.disk
+00005000: 4845 4c4c 4f20 2020 5458 5420 0000 0000  HELLO   TXT ....
+00005010: 6e53 6e53 0000 0000 6e53 0300 0e00 0000  nSnS....nS......
+00005020: 4449 5220 2020 2020 2020 2010 0000 0000  DIR        .....
+00005030: 6e53 6e53 0000 0000 6e53 0400 0000 0000  nSnS....nS......
+00005040: 454d 5054 5920 2020 2020 2020 0000 0000  EMPTY       ....
+00005050: 6e53 6e53 0000 0000 6e53 0000 0000 0000  nSnS....nS......
+</pre>
+</div>
+
+<p>
+To examine the contents of <code>HELLO.TXT</code>:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-text">$ xxd -s 20992 -l 14 fat32.disk
+0005200: 4865 6c6c 6f2c 2077 6f72 6c64 2e0a       Hello, world..
+</pre>
+</div>
+
+<p>
+Note that the offsets may vary depending on how the file system is formatted.
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-yourtasks" class="outline-2">
+<h2 id="yourtasks">Your tasks</h2>
+<div class="outline-text-2" id="text-yourtasks">
+<p>
+<b>Important:</b> before running your <code>nyufile</code> program, please make sure that your FAT32 disk is <b><b>unmounted</b></b>.
+</p>
+</div>
+
+<div id="outline-container-milestone1validateusage" class="outline-3">
+<h3 id="milestone1validateusage">Milestone 1: validate usage</h3>
+<div class="outline-text-3" id="text-milestone1validateusage">
+<p>
+There are several ways to invoke your <code>nyufile</code> program. Here is its usage:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-text">$ ./nyufile
+Usage: ./nyufile disk &lt;options&gt;
+  -i                     Print the file system information.
+  -l                     List the root directory.
+  -r filename [-s sha1]  Recover a contiguous file.
+  -R filename -s sha1    Recover a possibly non-contiguous file.
+</pre>
+</div>
+
+<p>
+The first argument is the filename of the disk image. After that, the options can be one of the following:
+</p>
+
+<ul class="org-ul">
+<li><code>-i</code></li>
+<li><code>-l</code></li>
+<li><code>-r filename</code></li>
+<li><code>-r filename -s sha1</code></li>
+<li><code>-R filename -s sha1</code></li>
+</ul>
+
+<p>
+You need to check if the command-line arguments are valid. If not, your program should print the above usage information and exit.
+</p>
+</div>
+</div>
+
+<div id="outline-container-milestone2printthefilesysteminformation" class="outline-3">
+<h3 id="milestone2printthefilesysteminformation">Milestone 2: print the file system information</h3>
+<div class="outline-text-3" id="text-milestone2printthefilesysteminformation">
+<p>
+If your <code>nyufile</code> program is invoked with option <code>-i</code>, it should print the following information about the FAT32 file system:
+</p>
+
+<ul class="org-ul">
+<li>Number of FATs;</li>
+<li>Number of bytes per sector;</li>
+<li>Number of sectors per cluster;</li>
+<li>Number of reserved sectors.</li>
+</ul>
+
+<p>
+Your output should be in the following format:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-text">$ ./nyufile fat32.disk -i
+Number of FATs = 2
+Number of bytes per sector = 512
+Number of sectors per cluster = 1
+Number of reserved sectors = 32
+</pre>
+</div>
+
+<p>
+For all milestones, you can assume that <code>nyufile</code> is invoked <b>while the disk is unmounted</b>.
+</p>
+</div>
+</div>
+
+<div id="outline-container-milestone3listtherootdirectory" class="outline-3">
+<h3 id="milestone3listtherootdirectory">Milestone 3: list the root directory</h3>
+<div class="outline-text-3" id="text-milestone3listtherootdirectory">
+<p>
+If your <code>nyufile</code> program is invoked with option <code>-l</code>, it should list all valid entries in the root directory with the following information:
+</p>
+
+<ul class="org-ul">
+<li><b>Filename.</b> Similar to <code>/bin/ls -p</code>, if the entry is a directory, you should <b>append a <code>/</code> indicator</b>.</li>
+<li><b>File size.</b></li>
+<li><b>Starting cluster.</b></li>
+</ul>
+
+<p>
+You should also print the total number of entries at the end. Your output should be in the following format:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-text">$ ./nyufile fat32.disk -l
+HELLO.TXT (size = 14, starting cluster = 3)
+DIR/ (size = 0, starting cluster = 4)
+EMPTY (size = 0, starting cluster = 0)
+Total number of entries = 3
+</pre>
+</div>
+
+<p>
+Here are a few assumptions:
+</p>
+
+<ul class="org-ul">
+<li>You <b>should not</b> list entries marked as deleted.</li>
+<li>You don’t need to print the details inside subdirectories.</li>
+<li>For all milestones, there will be no <a href="https://en.wikipedia.org/wiki/Long_filename">long filename (LFN)</a> entries. (If you have accidentally created LFN entries when you test your program, don’t worry. You can just skip the LFN entries and print only the <a href="https://en.wikipedia.org/wiki/8.3_filename">8.3 filename</a> entries.)</li>
+<li>All files and directories, including the root directory, may span across <b>more than one cluster</b>.</li>
+<li>There may be <b>empty</b> files.</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-milestone4recoverasmallfile" class="outline-3">
+<h3 id="milestone4recoverasmallfile">Milestone 4: recover a small file</h3>
+<div class="outline-text-3" id="text-milestone4recoverasmallfile">
+<p>
+If your <code>nyufile</code> program is invoked with option <code>-r filename</code>, it should recover the deleted file with the specified name. The workflow is better illustrated through an example:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-text">$ sudo mount -o umask=0 fat32.disk /mnt/disk
+$ ls -p /mnt/disk
+DIR/  EMPTY  HELLO.TXT
+$ cat /mnt/disk/HELLO.TXT
+Hello, world.
+$ rm /mnt/disk/HELLO.TXT
+$ ls -p /mnt/disk
+DIR/  EMPTY
+$ sudo umount /mnt/disk
+$ ./nyufile fat32.disk -l
+DIR/ (size = 0, starting cluster = 4)
+EMPTY (size = 0, starting cluster = 0)
+Total number of entries = 2
+$ ./nyufile fat32.disk -r HELLO
+HELLO: file not found
+$ ./nyufile fat32.disk -r HELLO.TXT
+HELLO.TXT: successfully recovered
+$ ./nyufile fat32.disk -l
+HELLO.TXT (size = 14, starting cluster = 3)
+DIR/ (size = 0, starting cluster = 4)
+EMPTY (size = 0, starting cluster = 0)
+Total number of entries = 3
+$ sudo mount -o umask=0 fat32.disk /mnt/disk
+$ ls -p /mnt/disk
+DIR/  EMPTY  HELLO.TXT
+$ cat /mnt/disk/HELLO.TXT
+Hello, world.
+</pre>
+</div>
+
+<p>
+For all milestones, you only need to recover <b>regular files</b> (including empty files, but not directory files) in the <b>root directory</b>. When the file is successfully recovered, your program should print <code>filename: successfully recovered</code>.
+</p>
+
+<p>
+For all milestones, you can assume that no other files or directories are created or modified since the deletion of the target file. However, multiple files may be deleted.
+</p>
+
+<p>
+Besides, for all milestones, you don’t need to update the <code>FSINFO</code> structure because most operating systems don’t care about it.
+</p>
+
+<p>
+Here are a few assumptions specifically for Milestone 4:
+</p>
+
+<ul class="org-ul">
+<li>The size of the deleted file is no more than the size of a cluster.</li>
+<li>At most one deleted directory entry matches the given filename. If no such entry exists, your program should print <code>filename: file not found</code>.</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-milestone5recoveralargecontiguouslyallocatedfile" class="outline-3">
+<h3 id="milestone5recoveralargecontiguouslyallocatedfile">Milestone 5: recover a large contiguously-allocated file</h3>
+<div class="outline-text-3" id="text-milestone5recoveralargecontiguouslyallocatedfile">
+<p>
+Now, you will recover a file that is larger than one cluster. Nevertheless, for Milestone 5, you can assume that such a file is allocated contiguously. You can continue to assume that at most one deleted directory entry matches the given filename. If no such entry exists, your program should print <code>filename: file not found</code>.
+</p>
+</div>
+</div>
+
+<div id="outline-container-milestone6detectambiguousfilerecoveryrequests" class="outline-3">
+<h3 id="milestone6detectambiguousfilerecoveryrequests">Milestone 6: detect ambiguous file recovery requests</h3>
+<div class="outline-text-3" id="text-milestone6detectambiguousfilerecoveryrequests">
+<p>
+In Milestones 4 and 5, you assumed that at most one deleted directory entry matches the given filename. However, multiple files whose names differ only in the first character would end up having the same name when deleted. Therefore, you may encounter more than one deleted directory entry matching the given filename. When that happens, your program should print <code>filename: multiple candidates found</code> and abort.
+</p>
+
+<p>
+This scenario is illustrated in the following example:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-text">$ sudo mount -o umask=0 fat32.disk /mnt/disk
+$ echo "My last name is Tang." &gt; /mnt/disk/TANG.TXT
+$ echo "My first name is Yang." &gt; /mnt/disk/YANG.TXT
+$ sync
+$ rm /mnt/disk/TANG.TXT /mnt/disk/YANG.TXT
+$ sudo umount /mnt/disk
+$ ./nyufile fat32.disk -r TANG.TXT
+TANG.TXT: multiple candidates found
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-milestone7recoveracontiguouslyallocatedfilewithsha1hash" class="outline-3">
+<h3 id="milestone7recoveracontiguouslyallocatedfilewithsha1hash">Milestone 7: recover a contiguously-allocated file with SHA-1 hash</h3>
+<div class="outline-text-3" id="text-milestone7recoveracontiguouslyallocatedfilewithsha1hash">
+<p>
+To solve the aforementioned ambiguity, the user can provide a <a href="https://en.wikipedia.org/wiki/SHA-1">SHA-1</a> hash via command-line option <code>-s sha1</code> to help identify which deleted directory entry should be the target file.
+</p>
+
+<p>
+In short, a SHA-1 hash is a 160-bit fingerprint of a file, often represented as 40 hexadecimal digits. For the purpose of this lab, you can assume that identical files always have the same SHA-1 hash, and different files always have vastly different SHA-1 hashes. Therefore, even if multiple candidates are found during recovery, at most one will match the given SHA-1 hash.
+</p>
+
+<p>
+This scenario is illustrated in the following example:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-text">$ ./nyufile fat32.disk -r TANG.TXT -s c91761a2cc1562d36585614c8c680ecf5712e875
+TANG.TXT: successfully recovered with SHA-1
+$ ./nyufile fat32.disk -l
+HELLO.TXT (size = 14, starting cluster = 3)
+DIR/ (size = 0, starting cluster = 4)
+EMPTY (size = 0, starting cluster = 0)
+TANG.TXT (size = 22, starting cluster = 5)
+Total number of entries = 4
+</pre>
+</div>
+
+<p>
+When the file is successfully recovered with SHA-1, your program should print <code>filename: successfully recovered with SHA-1</code>.
+</p>
+
+<p>
+Note that you can use the <code>sha1sum</code> command to compute the SHA-1 hash of a file:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-text">$ sha1sum /mnt/disk/TANG.TXT
+c91761a2cc1562d36585614c8c680ecf5712e875  /mnt/disk/TANG.TXT
+</pre>
+</div>
+
+<p>
+Also note that it is possible that the file is empty or occupies only one cluster. The SHA-1 hash for an empty file is <code>da39a3ee5e6b4b0d3255bfef95601890afd80709</code>.
+</p>
+
+<p>
+If no such file matches the given SHA-1 hash, your program should print <code>filename: file not found</code>. For example:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-text">$ ./nyufile fat32.disk -r TANG.TXT -s 0123456789abcdef0123456789abcdef01234567
+TANG.TXT: file not found
+</pre>
+</div>
+
+<p>
+The OpenSSL library provides a function <code>SHA1()</code>, which computes the SHA-1 hash of <code>d[0...n-1]</code> and stores the result in <code>md[0...SHA_DIGEST_LENGTH-1]</code>:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-c"><span style="color: #4078f2; font-weight: bold;">#include</span> <span style="color: #50a14f;">&lt;openssl/sha.h&gt;</span>
+
+<span style="color: #4078f2; font-weight: bold;">#define</span> <span style="color: #6a1868;">SHA_DIGEST_LENGTH</span> <span style="color: #da8548; font-weight: bold;">20</span>
+
+<span style="color: #986801;">unsigned</span> <span style="color: #986801;">char</span> *<span style="color: #a626a4;">SHA1</span>(<span style="color: #e45649;">const</span> <span style="color: #986801;">unsigned</span> <span style="color: #986801;">char</span> *<span style="color: #6a1868;">d</span>, <span style="color: #986801;">size_t</span> <span style="color: #6a1868;">n</span>, <span style="color: #986801;">unsigned</span> <span style="color: #986801;">char</span> *<span style="color: #6a1868;">md</span>);
+</pre>
+</div>
+
+<p>
+You need to add the compiler option <code>-l crypto</code> to link with the OpenSSL library.
+</p>
+</div>
+</div>
+
+<div id="outline-container-milestone8recoveranoncontiguouslyallocatedfile" class="outline-3">
+<h3 id="milestone8recoveranoncontiguouslyallocatedfile">Milestone 8: recover a non-contiguously allocated file</h3>
+<div class="outline-text-3" id="text-milestone8recoveranoncontiguouslyallocatedfile">
+<p>
+Finally, the clusters of a file are no longer assumed to be contiguous. You have to try every permutation of unallocated clusters on the file system in order to find the one that matches the SHA-1 hash.
+</p>
+
+<p>
+The command-line option is <code>-R filename -s sha1</code>. The SHA-1 hash must be given.
+</p>
+
+<p>
+Note that it is possible that the file is empty or occupies only one cluster. If so, <code>-R</code> behaves the same as <code>-r</code>, as described in Milestone 7.
+</p>
+
+<p>
+For Milestone 8, you can assume that the entire file is within the first 12 clusters, so that a brute-force search is feasible.
+</p>
+
+<p>
+If you cannot find a file that matches the given SHA-1 hash, your program should print <code>filename: file not found</code>.
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-fat32datastructures" class="outline-2">
+<h2 id="fat32datastructures">FAT32 data structures</h2>
+<div class="outline-text-2" id="text-fat32datastructures">
+<p>
+For your convenience, here are some data structures that you can copy and paste. Please refer to the lecture slides for details on the FAT32 file system layout.
+</p>
+</div>
+
+<div id="outline-container-bootsector" class="outline-3">
+<h3 id="bootsector">Boot sector</h3>
+<div class="outline-text-3" id="text-bootsector">
+<div class="org-src-container">
+<pre class="src src-c"><span style="color: #4078f2; font-weight: bold;">#pragma</span> pack(push,<span style="color: #da8548; font-weight: bold;">1</span>)
+<span style="color: #e45649;">typedef</span> <span style="color: #e45649;">struct</span> <span style="color: #986801;">BootEntry</span> {
+  <span style="color: #986801;">unsigned</span> <span style="color: #986801;">char</span>  <span style="color: #6a1868;">BS_jmpBoot</span>[<span style="color: #da8548; font-weight: bold;">3</span>];     <span style="color: #9ca0a4; font-style: italic;">// </span><span style="color: #9ca0a4; font-style: italic;">Assembly instruction to jump to boot code</span>
+  <span style="color: #986801;">unsigned</span> <span style="color: #986801;">char</span>  <span style="color: #6a1868;">BS_OEMName</span>[<span style="color: #da8548; font-weight: bold;">8</span>];     <span style="color: #9ca0a4; font-style: italic;">// </span><span style="color: #9ca0a4; font-style: italic;">OEM Name in ASCII</span>
+  <span style="color: #986801;">unsigned</span> <span style="color: #986801;">short</span> <span style="color: #6a1868;">BPB_BytsPerSec</span>;    <span style="color: #9ca0a4; font-style: italic;">// </span><span style="color: #9ca0a4; font-style: italic;">Bytes per sector. Allowed values include 512, 1024, 2048, and 4096</span>
+  <span style="color: #986801;">unsigned</span> <span style="color: #986801;">char</span>  <span style="color: #6a1868;">BPB_SecPerClus</span>;    <span style="color: #9ca0a4; font-style: italic;">// </span><span style="color: #9ca0a4; font-style: italic;">Sectors per cluster (data unit). Allowed values are powers of 2, but the cluster size must be 32KB or smaller</span>
+  <span style="color: #986801;">unsigned</span> <span style="color: #986801;">short</span> <span style="color: #6a1868;">BPB_RsvdSecCnt</span>;    <span style="color: #9ca0a4; font-style: italic;">// </span><span style="color: #9ca0a4; font-style: italic;">Size in sectors of the reserved area</span>
+  <span style="color: #986801;">unsigned</span> <span style="color: #986801;">char</span>  <span style="color: #6a1868;">BPB_NumFATs</span>;       <span style="color: #9ca0a4; font-style: italic;">// </span><span style="color: #9ca0a4; font-style: italic;">Number of FATs</span>
+  <span style="color: #986801;">unsigned</span> <span style="color: #986801;">short</span> <span style="color: #6a1868;">BPB_RootEntCnt</span>;    <span style="color: #9ca0a4; font-style: italic;">// </span><span style="color: #9ca0a4; font-style: italic;">Maximum number of files in the root directory for FAT12 and FAT16. This is 0 for FAT32</span>
+  <span style="color: #986801;">unsigned</span> <span style="color: #986801;">short</span> <span style="color: #6a1868;">BPB_TotSec16</span>;      <span style="color: #9ca0a4; font-style: italic;">// </span><span style="color: #9ca0a4; font-style: italic;">16-bit value of number of sectors in file system</span>
+  <span style="color: #986801;">unsigned</span> <span style="color: #986801;">char</span>  <span style="color: #6a1868;">BPB_Media</span>;         <span style="color: #9ca0a4; font-style: italic;">// </span><span style="color: #9ca0a4; font-style: italic;">Media type</span>
+  <span style="color: #986801;">unsigned</span> <span style="color: #986801;">short</span> <span style="color: #6a1868;">BPB_FATSz16</span>;       <span style="color: #9ca0a4; font-style: italic;">// </span><span style="color: #9ca0a4; font-style: italic;">16-bit size in sectors of each FAT for FAT12 and FAT16. For FAT32, this field is 0</span>
+  <span style="color: #986801;">unsigned</span> <span style="color: #986801;">short</span> <span style="color: #6a1868;">BPB_SecPerTrk</span>;     <span style="color: #9ca0a4; font-style: italic;">// </span><span style="color: #9ca0a4; font-style: italic;">Sectors per track of storage device</span>
+  <span style="color: #986801;">unsigned</span> <span style="color: #986801;">short</span> <span style="color: #6a1868;">BPB_NumHeads</span>;      <span style="color: #9ca0a4; font-style: italic;">// </span><span style="color: #9ca0a4; font-style: italic;">Number of heads in storage device</span>
+  <span style="color: #986801;">unsigned</span> <span style="color: #986801;">int</span>   <span style="color: #6a1868;">BPB_HiddSec</span>;       <span style="color: #9ca0a4; font-style: italic;">// </span><span style="color: #9ca0a4; font-style: italic;">Number of sectors before the start of partition</span>
+  <span style="color: #986801;">unsigned</span> <span style="color: #986801;">int</span>   <span style="color: #6a1868;">BPB_TotSec32</span>;      <span style="color: #9ca0a4; font-style: italic;">// </span><span style="color: #9ca0a4; font-style: italic;">32-bit value of number of sectors in file system. Either this value or the 16-bit value above must be 0</span>
+  <span style="color: #986801;">unsigned</span> <span style="color: #986801;">int</span>   <span style="color: #6a1868;">BPB_FATSz32</span>;       <span style="color: #9ca0a4; font-style: italic;">// </span><span style="color: #9ca0a4; font-style: italic;">32-bit size in sectors of one FAT</span>
+  <span style="color: #986801;">unsigned</span> <span style="color: #986801;">short</span> <span style="color: #6a1868;">BPB_ExtFlags</span>;      <span style="color: #9ca0a4; font-style: italic;">// </span><span style="color: #9ca0a4; font-style: italic;">A flag for FAT</span>
+  <span style="color: #986801;">unsigned</span> <span style="color: #986801;">short</span> <span style="color: #6a1868;">BPB_FSVer</span>;         <span style="color: #9ca0a4; font-style: italic;">// </span><span style="color: #9ca0a4; font-style: italic;">The major and minor version number</span>
+  <span style="color: #986801;">unsigned</span> <span style="color: #986801;">int</span>   <span style="color: #6a1868;">BPB_RootClus</span>;      <span style="color: #9ca0a4; font-style: italic;">// </span><span style="color: #9ca0a4; font-style: italic;">Cluster where the root directory can be found</span>
+  <span style="color: #986801;">unsigned</span> <span style="color: #986801;">short</span> <span style="color: #6a1868;">BPB_FSInfo</span>;        <span style="color: #9ca0a4; font-style: italic;">// </span><span style="color: #9ca0a4; font-style: italic;">Sector where FSINFO structure can be found</span>
+  <span style="color: #986801;">unsigned</span> <span style="color: #986801;">short</span> <span style="color: #6a1868;">BPB_BkBootSec</span>;     <span style="color: #9ca0a4; font-style: italic;">// </span><span style="color: #9ca0a4; font-style: italic;">Sector where backup copy of boot sector is located</span>
+  <span style="color: #986801;">unsigned</span> <span style="color: #986801;">char</span>  <span style="color: #6a1868;">BPB_Reserved</span>[<span style="color: #da8548; font-weight: bold;">12</span>];  <span style="color: #9ca0a4; font-style: italic;">// </span><span style="color: #9ca0a4; font-style: italic;">Reserved</span>
+  <span style="color: #986801;">unsigned</span> <span style="color: #986801;">char</span>  <span style="color: #6a1868;">BS_DrvNum</span>;         <span style="color: #9ca0a4; font-style: italic;">// </span><span style="color: #9ca0a4; font-style: italic;">BIOS INT13h drive number</span>
+  <span style="color: #986801;">unsigned</span> <span style="color: #986801;">char</span>  <span style="color: #6a1868;">BS_Reserved1</span>;      <span style="color: #9ca0a4; font-style: italic;">// </span><span style="color: #9ca0a4; font-style: italic;">Not used</span>
+  <span style="color: #986801;">unsigned</span> <span style="color: #986801;">char</span>  <span style="color: #6a1868;">BS_BootSig</span>;        <span style="color: #9ca0a4; font-style: italic;">// </span><span style="color: #9ca0a4; font-style: italic;">Extended boot signature to identify if the next three values are valid</span>
+  <span style="color: #986801;">unsigned</span> <span style="color: #986801;">int</span>   <span style="color: #6a1868;">BS_VolID</span>;          <span style="color: #9ca0a4; font-style: italic;">// </span><span style="color: #9ca0a4; font-style: italic;">Volume serial number</span>
+  <span style="color: #986801;">unsigned</span> <span style="color: #986801;">char</span>  <span style="color: #6a1868;">BS_VolLab</span>[<span style="color: #da8548; font-weight: bold;">11</span>];     <span style="color: #9ca0a4; font-style: italic;">// </span><span style="color: #9ca0a4; font-style: italic;">Volume label in ASCII. User defines when creating the file system</span>
+  <span style="color: #986801;">unsigned</span> <span style="color: #986801;">char</span>  <span style="color: #6a1868;">BS_FilSysType</span>[<span style="color: #da8548; font-weight: bold;">8</span>];  <span style="color: #9ca0a4; font-style: italic;">// </span><span style="color: #9ca0a4; font-style: italic;">File system type label in ASCII</span>
+} <span style="color: #986801;">BootEntry</span>;
+<span style="color: #4078f2; font-weight: bold;">#pragma</span> pack(pop)
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-directoryentry" class="outline-3">
+<h3 id="directoryentry">Directory entry</h3>
+<div class="outline-text-3" id="text-directoryentry">
+<div class="org-src-container">
+<pre class="src src-c"><span style="color: #4078f2; font-weight: bold;">#pragma</span> pack(push,<span style="color: #da8548; font-weight: bold;">1</span>)
+<span style="color: #e45649;">typedef</span> <span style="color: #e45649;">struct</span> <span style="color: #986801;">DirEntry</span> {
+  <span style="color: #986801;">unsigned</span> <span style="color: #986801;">char</span>  <span style="color: #6a1868;">DIR_Name</span>[<span style="color: #da8548; font-weight: bold;">11</span>];      <span style="color: #9ca0a4; font-style: italic;">// </span><span style="color: #9ca0a4; font-style: italic;">File name</span>
+  <span style="color: #986801;">unsigned</span> <span style="color: #986801;">char</span>  <span style="color: #6a1868;">DIR_Attr</span>;          <span style="color: #9ca0a4; font-style: italic;">// </span><span style="color: #9ca0a4; font-style: italic;">File attributes</span>
+  <span style="color: #986801;">unsigned</span> <span style="color: #986801;">char</span>  <span style="color: #6a1868;">DIR_NTRes</span>;         <span style="color: #9ca0a4; font-style: italic;">// </span><span style="color: #9ca0a4; font-style: italic;">Reserved</span>
+  <span style="color: #986801;">unsigned</span> <span style="color: #986801;">char</span>  <span style="color: #6a1868;">DIR_CrtTimeTenth</span>;  <span style="color: #9ca0a4; font-style: italic;">// </span><span style="color: #9ca0a4; font-style: italic;">Created time (tenths of second)</span>
+  <span style="color: #986801;">unsigned</span> <span style="color: #986801;">short</span> <span style="color: #6a1868;">DIR_CrtTime</span>;       <span style="color: #9ca0a4; font-style: italic;">// </span><span style="color: #9ca0a4; font-style: italic;">Created time (hours, minutes, seconds)</span>
+  <span style="color: #986801;">unsigned</span> <span style="color: #986801;">short</span> <span style="color: #6a1868;">DIR_CrtDate</span>;       <span style="color: #9ca0a4; font-style: italic;">// </span><span style="color: #9ca0a4; font-style: italic;">Created day</span>
+  <span style="color: #986801;">unsigned</span> <span style="color: #986801;">short</span> <span style="color: #6a1868;">DIR_LstAccDate</span>;    <span style="color: #9ca0a4; font-style: italic;">// </span><span style="color: #9ca0a4; font-style: italic;">Accessed day</span>
+  <span style="color: #986801;">unsigned</span> <span style="color: #986801;">short</span> <span style="color: #6a1868;">DIR_FstClusHI</span>;     <span style="color: #9ca0a4; font-style: italic;">// </span><span style="color: #9ca0a4; font-style: italic;">High 2 bytes of the first cluster address</span>
+  <span style="color: #986801;">unsigned</span> <span style="color: #986801;">short</span> <span style="color: #6a1868;">DIR_WrtTime</span>;       <span style="color: #9ca0a4; font-style: italic;">// </span><span style="color: #9ca0a4; font-style: italic;">Written time (hours, minutes, seconds</span>
+  <span style="color: #986801;">unsigned</span> <span style="color: #986801;">short</span> <span style="color: #6a1868;">DIR_WrtDate</span>;       <span style="color: #9ca0a4; font-style: italic;">// </span><span style="color: #9ca0a4; font-style: italic;">Written day</span>
+  <span style="color: #986801;">unsigned</span> <span style="color: #986801;">short</span> <span style="color: #6a1868;">DIR_FstClusLO</span>;     <span style="color: #9ca0a4; font-style: italic;">// </span><span style="color: #9ca0a4; font-style: italic;">Low 2 bytes of the first cluster address</span>
+  <span style="color: #986801;">unsigned</span> <span style="color: #986801;">int</span>   <span style="color: #6a1868;">DIR_FileSize</span>;      <span style="color: #9ca0a4; font-style: italic;">// </span><span style="color: #9ca0a4; font-style: italic;">File size in bytes. (0 for directories)</span>
+} <span style="color: #986801;">DirEntry</span>;
+<span style="color: #4078f2; font-weight: bold;">#pragma</span> pack(pop)
+</pre>
+</div>
+</div>
+</div>
+</div>
+
+<div id="outline-container-compiling" class="outline-2">
+<h2 id="compiling">Compiling</h2>
+<div class="outline-text-2" id="text-compiling">
+<p>
+We will grade your submission on a CentOS 7.9 system. We will compile your program using <code>gcc</code> 4.8.5. You must provide a <code>Makefile</code>, and by running <code>make</code>, it should generate an executable file named <code>nyufile</code> in the current working directory. Note that you need to add the compiler option <code>-l crypto</code>.
+</p>
+</div>
+</div>
+
+<div id="outline-container-testing" class="outline-2">
+<h2 id="testing">Testing</h2>
+<div class="outline-text-2" id="text-testing">
+<p>
+To get started with testing, you can download a <a href="https://cs.nyu.edu/courses/fall21/CSCI-GA.2250-002/fat32.disk.gz">sample FAT32 disk</a> and expand it with the following command:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-text">$ gunzip fat32.disk.gz
+</pre>
+</div>
+
+<p>
+There are a few files on this disk:
+</p>
+
+<ul class="org-ul">
+<li><code>HELLO.TXT</code> – a small text file.</li>
+<li><code>DIR</code> – an empty directory.</li>
+<li><code>EMPTY.TXT</code> – an empty file.</li>
+<li><code>CONT.TXT</code> – a large contiguously-allocated file.</li>
+<li><code>NON_CONT.TXT</code> – a large non-contiguously allocated file.</li>
+</ul>
+
+<p>
+You should make your own test cases and test your program thoroughly. Make sure to test your program with disks formatted with different parameters.
+</p>
+
+<p>
+We will provide sample test cases and grading script one week before the deadline.
+</p>
+</div>
+</div>
+
+<div id="outline-container-submission" class="outline-2">
+<h2 id="submission">Submission</h2>
+<div class="outline-text-2" id="text-submission">
+<p>
+You will submit an archive containing all files needed to compile <code>nyufile</code>. You can do so with the following command:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-text">$ tar cvJf nyufile-Your_NetID.tar.xz Makefile *.h *.c
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-rubric" class="outline-2">
+<h2 id="rubric">Rubric</h2>
+<div class="outline-text-2" id="text-rubric">
+<p>
+The total of this lab is 100 points, mapped to 15% of your final grade of this course.
+</p>
+
+<ul class="org-ul">
+<li>Milestone 1: validate usage. (40 points)</li>
+<li>Milestone 2: print the file system information. (5 points)</li>
+<li>Milestone 3: list the root directory. (10 points)</li>
+<li>Milestone 4: recover a small file. (15 points)</li>
+<li>Milestone 5: recover a large contiguously-allocated file. (10 points)</li>
+<li>Milestone 6: detect ambiguous file recovery requests. (5 points)</li>
+<li>Milestone 7a: recover a small file with SHA-1 hash. (5 points)</li>
+<li>Milestone 7b: recover a large contiguously-allocated file with SHA-1 hash. (5 points)</li>
+<li>Milestone 8: recover a non-contiguously allocated file. (5 points)</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-tips" class="outline-2">
+<h2 id="tips">Tips</h2>
+<div class="outline-text-2" id="text-tips">
+</div>
+<div id="outline-container-dontprocrastinate" class="outline-3">
+<h3 id="dontprocrastinate">Don’t procrastinate</h3>
+<div class="outline-text-3" id="text-dontprocrastinate">
+<p>
+This lab requires significant programming effort. Therefore, <b>start as early as possible!</b> Don’t wait until the last week.
+</p>
+</div>
+</div>
+
+<div id="outline-container-somegeneralhints" class="outline-3">
+<h3 id="somegeneralhints">Some general hints</h3>
+<div class="outline-text-3" id="text-somegeneralhints">
+<ul class="org-ul">
+<li>Before you start, use <code>xxd</code> to examine the disk image to get an idea of the FAT32 layout. Keep a backup of the hexdump.</li>
+<li>After you create a file or delete a file, use <code>xxd</code> to compare the hexdump of the disk image against your backup to see what has changed.</li>
+<li>You can also use <code>xxd -r</code> to convert a hexdump back to a binary file. You can use it to “hack” a disk image. In this way, you can try recovering a file manually before writing a program to do it. You can also create a non-contiguously allocated file artificially for testing in this way.</li>
+<li>Always <b>umount</b> before using <code>xxd</code> or running your <code>nyufile</code> program.</li>
+<li>When updating FAT, remember to update <b>all</b> FATs.</li>
+<li>Using <code>mmap()</code> to access the file system image is more convenient than <code>read()</code> or <code>fread()</code>.</li>
+<li>The milestones have <a href="https://en.wikipedia.org/wiki/Diminishing_returns">diminishing returns</a>. Easier milestones are worth more points. Make sure you get them right before trying to tackle the harder ones.</li>
+</ul>
+
+<p>
+<i>This lab has borrowed some ideas from Dr. T. Y. Wong.</i>
+</p>
+</div>
+</div>
+</div>
+</div>
+
+
+</body></html>

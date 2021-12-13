@@ -1,0 +1,927 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<!-- saved from url=(0056)https://cs.nyu.edu/courses/fall21/CSCI-GA.2250-002/nyush -->
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lab 2: Shell</title>
+<meta name="generator" content="Org Mode">
+<style type="text/css">
+ <!--/*--><![CDATA[/*><!--*/
+  .title  { text-align: center;
+             margin-bottom: .2em; }
+  .subtitle { text-align: center;
+              font-size: medium;
+              font-weight: bold;
+              margin-top:0; }
+  .todo   { font-family: monospace; color: red; }
+  .done   { font-family: monospace; color: green; }
+  .priority { font-family: monospace; color: orange; }
+  .tag    { background-color: #eee; font-family: monospace;
+            padding: 2px; font-size: 80%; font-weight: normal; }
+  .timestamp { color: #bebebe; }
+  .timestamp-kwd { color: #5f9ea0; }
+  .org-right  { margin-left: auto; margin-right: 0px;  text-align: right; }
+  .org-left   { margin-left: 0px;  margin-right: auto; text-align: left; }
+  .org-center { margin-left: auto; margin-right: auto; text-align: center; }
+  .underline { text-decoration: underline; }
+  #postamble p, #preamble p { font-size: 90%; margin: .2em; }
+  p.verse { margin-left: 3%; }
+  pre {
+    border: 1px solid #ccc;
+    box-shadow: 3px 3px 3px #eee;
+    padding: 8pt;
+    font-family: monospace;
+    overflow: auto;
+    margin: 1.2em;
+  }
+  pre.src {
+    position: relative;
+    overflow: auto;
+    padding-top: 1.2em;
+  }
+  pre.src:before {
+    display: none;
+    position: absolute;
+    background-color: white;
+    top: -10px;
+    right: 10px;
+    padding: 3px;
+    border: 1px solid black;
+  }
+  pre.src:hover:before { display: inline; margin-top: 14px;}
+  /* Languages per Org manual */
+  pre.src-asymptote:before { content: 'Asymptote'; }
+  pre.src-awk:before { content: 'Awk'; }
+  pre.src-C:before { content: 'C'; }
+  /* pre.src-C++ doesn't work in CSS */
+  pre.src-clojure:before { content: 'Clojure'; }
+  pre.src-css:before { content: 'CSS'; }
+  pre.src-D:before { content: 'D'; }
+  pre.src-ditaa:before { content: 'ditaa'; }
+  pre.src-dot:before { content: 'Graphviz'; }
+  pre.src-calc:before { content: 'Emacs Calc'; }
+  pre.src-emacs-lisp:before { content: 'Emacs Lisp'; }
+  pre.src-fortran:before { content: 'Fortran'; }
+  pre.src-gnuplot:before { content: 'gnuplot'; }
+  pre.src-haskell:before { content: 'Haskell'; }
+  pre.src-hledger:before { content: 'hledger'; }
+  pre.src-java:before { content: 'Java'; }
+  pre.src-js:before { content: 'Javascript'; }
+  pre.src-latex:before { content: 'LaTeX'; }
+  pre.src-ledger:before { content: 'Ledger'; }
+  pre.src-lisp:before { content: 'Lisp'; }
+  pre.src-lilypond:before { content: 'Lilypond'; }
+  pre.src-lua:before { content: 'Lua'; }
+  pre.src-matlab:before { content: 'MATLAB'; }
+  pre.src-mscgen:before { content: 'Mscgen'; }
+  pre.src-ocaml:before { content: 'Objective Caml'; }
+  pre.src-octave:before { content: 'Octave'; }
+  pre.src-org:before { content: 'Org mode'; }
+  pre.src-oz:before { content: 'OZ'; }
+  pre.src-plantuml:before { content: 'Plantuml'; }
+  pre.src-processing:before { content: 'Processing.js'; }
+  pre.src-python:before { content: 'Python'; }
+  pre.src-R:before { content: 'R'; }
+  pre.src-ruby:before { content: 'Ruby'; }
+  pre.src-sass:before { content: 'Sass'; }
+  pre.src-scheme:before { content: 'Scheme'; }
+  pre.src-screen:before { content: 'Gnu Screen'; }
+  pre.src-sed:before { content: 'Sed'; }
+  pre.src-sh:before { content: 'shell'; }
+  pre.src-sql:before { content: 'SQL'; }
+  pre.src-sqlite:before { content: 'SQLite'; }
+  /* additional languages in org.el's org-babel-load-languages alist */
+  pre.src-forth:before { content: 'Forth'; }
+  pre.src-io:before { content: 'IO'; }
+  pre.src-J:before { content: 'J'; }
+  pre.src-makefile:before { content: 'Makefile'; }
+  pre.src-maxima:before { content: 'Maxima'; }
+  pre.src-perl:before { content: 'Perl'; }
+  pre.src-picolisp:before { content: 'Pico Lisp'; }
+  pre.src-scala:before { content: 'Scala'; }
+  pre.src-shell:before { content: 'Shell Script'; }
+  pre.src-ebnf2ps:before { content: 'ebfn2ps'; }
+  /* additional language identifiers per "defun org-babel-execute"
+       in ob-*.el */
+  pre.src-cpp:before  { content: 'C++'; }
+  pre.src-abc:before  { content: 'ABC'; }
+  pre.src-coq:before  { content: 'Coq'; }
+  pre.src-groovy:before  { content: 'Groovy'; }
+  /* additional language identifiers from org-babel-shell-names in
+     ob-shell.el: ob-shell is the only babel language using a lambda to put
+     the execution function name together. */
+  pre.src-bash:before  { content: 'bash'; }
+  pre.src-csh:before  { content: 'csh'; }
+  pre.src-ash:before  { content: 'ash'; }
+  pre.src-dash:before  { content: 'dash'; }
+  pre.src-ksh:before  { content: 'ksh'; }
+  pre.src-mksh:before  { content: 'mksh'; }
+  pre.src-posh:before  { content: 'posh'; }
+  /* Additional Emacs modes also supported by the LaTeX listings package */
+  pre.src-ada:before { content: 'Ada'; }
+  pre.src-asm:before { content: 'Assembler'; }
+  pre.src-caml:before { content: 'Caml'; }
+  pre.src-delphi:before { content: 'Delphi'; }
+  pre.src-html:before { content: 'HTML'; }
+  pre.src-idl:before { content: 'IDL'; }
+  pre.src-mercury:before { content: 'Mercury'; }
+  pre.src-metapost:before { content: 'MetaPost'; }
+  pre.src-modula-2:before { content: 'Modula-2'; }
+  pre.src-pascal:before { content: 'Pascal'; }
+  pre.src-ps:before { content: 'PostScript'; }
+  pre.src-prolog:before { content: 'Prolog'; }
+  pre.src-simula:before { content: 'Simula'; }
+  pre.src-tcl:before { content: 'tcl'; }
+  pre.src-tex:before { content: 'TeX'; }
+  pre.src-plain-tex:before { content: 'Plain TeX'; }
+  pre.src-verilog:before { content: 'Verilog'; }
+  pre.src-vhdl:before { content: 'VHDL'; }
+  pre.src-xml:before { content: 'XML'; }
+  pre.src-nxml:before { content: 'XML'; }
+  /* add a generic configuration mode; LaTeX export needs an additional
+     (add-to-list 'org-latex-listings-langs '(conf " ")) in .emacs */
+  pre.src-conf:before { content: 'Configuration File'; }
+
+  table { border-collapse:collapse; }
+  caption.t-above { caption-side: top; }
+  caption.t-bottom { caption-side: bottom; }
+  td, th { vertical-align:top;  }
+  th.org-right  { text-align: center;  }
+  th.org-left   { text-align: center;   }
+  th.org-center { text-align: center; }
+  td.org-right  { text-align: right;  }
+  td.org-left   { text-align: left;   }
+  td.org-center { text-align: center; }
+  dt { font-weight: bold; }
+  .footpara { display: inline; }
+  .footdef  { margin-bottom: 1em; }
+  .figure { padding: 1em; }
+  .figure p { text-align: center; }
+  .equation-container {
+    display: table;
+    text-align: center;
+    width: 100%;
+  }
+  .equation {
+    vertical-align: middle;
+  }
+  .equation-label {
+    display: table-cell;
+    text-align: right;
+    vertical-align: middle;
+  }
+  .inlinetask {
+    padding: 10px;
+    border: 2px solid gray;
+    margin: 10px;
+    background: #ffffcc;
+  }
+  #org-div-home-and-up
+   { text-align: right; font-size: 70%; white-space: nowrap; }
+  textarea { overflow-x: auto; }
+  .linenr { font-size: smaller }
+  .code-highlighted { background-color: #ffff00; }
+  .org-info-js_info-navigation { border-style: none; }
+  #org-info-js_console-label
+    { font-size: 10px; font-weight: bold; white-space: nowrap; }
+  .org-info-js_search-highlight
+    { background-color: #ffff00; color: #000000; font-weight: bold; }
+  .org-svg { width: 90%; }
+  /*]]>*/-->
+</style>
+<link rel="stylesheet" type="text/css" href="./Lab 2_ Shell_files/htmlize.css">
+<link rel="stylesheet" type="text/css" href="./Lab 2_ Shell_files/readtheorg.css">
+<script src="./Lab 2_ Shell_files/jquery.min.js.download"></script>
+<script src="./Lab 2_ Shell_files/bootstrap.min.js.download"></script>
+<script type="text/javascript" src="./Lab 2_ Shell_files/jquery.stickytableheaders.min.js.download"></script>
+<script type="text/javascript" src="./Lab 2_ Shell_files/readtheorg.js.download"></script>
+<style>pre.src{background:#fafafa;color:#383a42;}</style>
+<script type="text/javascript">
+// @license magnet:?xt=urn:btih:e95b018ef3580986a04669f1b5879592219e2a7a&dn=public-domain.txt Public Domain
+<!--/*--><![CDATA[/*><!--*/
+     function CodeHighlightOn(elem, id)
+     {
+       var target = document.getElementById(id);
+       if(null != target) {
+         elem.classList.add("code-highlighted");
+         target.classList.add("code-highlighted");
+       }
+     }
+     function CodeHighlightOff(elem, id)
+     {
+       var target = document.getElementById(id);
+       if(null != target) {
+         elem.classList.remove("code-highlighted");
+         target.classList.remove("code-highlighted");
+       }
+     }
+    /*]]>*///-->
+// @license-end
+</script>
+<style></style><script async="" src="./Lab 2_ Shell_files/adblocker-chromeglobalinjectjs.js.download"></script></head>
+<body>
+<div id="content"><div id="toggle-sidebar"><a href="https://cs.nyu.edu/courses/fall21/CSCI-GA.2250-002/nyush#table-of-contents"><h2>Table of Contents</h2></a></div>
+<h1 class="title">Lab 2: Shell</h1>
+<div id="table-of-contents">
+<h2>Table of Contents<a class="close-sidebar" href="https://cs.nyu.edu/courses/fall21/CSCI-GA.2250-002/nyush#">Close</a></h2>
+<div id="text-table-of-contents">
+<ul class="nav">
+<li><a href="https://cs.nyu.edu/courses/fall21/CSCI-GA.2250-002/nyush#introduction">Introduction</a></li>
+<li><a href="https://cs.nyu.edu/courses/fall21/CSCI-GA.2250-002/nyush#objectives">Objectives</a></li>
+<li><a href="https://cs.nyu.edu/courses/fall21/CSCI-GA.2250-002/nyush#overview">Overview</a></li>
+<li><a href="https://cs.nyu.edu/courses/fall21/CSCI-GA.2250-002/nyush#specifications">Specifications</a>
+<ul>
+<li><a href="https://cs.nyu.edu/courses/fall21/CSCI-GA.2250-002/nyush#theprompt">The prompt</a></li>
+<li><a href="https://cs.nyu.edu/courses/fall21/CSCI-GA.2250-002/nyush#thecommand">The command</a></li>
+<li><a href="https://cs.nyu.edu/courses/fall21/CSCI-GA.2250-002/nyush#locatingprograms">Locating programs</a></li>
+<li><a href="https://cs.nyu.edu/courses/fall21/CSCI-GA.2250-002/nyush#processterminationandsuspension">Process termination and suspension</a></li>
+<li><a href="https://cs.nyu.edu/courses/fall21/CSCI-GA.2250-002/nyush#signalhandling">Signal handling</a></li>
+<li><a href="https://cs.nyu.edu/courses/fall21/CSCI-GA.2250-002/nyush#ioredirection">I/O redirection</a>
+<ul>
+<li><a href="https://cs.nyu.edu/courses/fall21/CSCI-GA.2250-002/nyush#inputredirection">Input redirection</a></li>
+<li><a href="https://cs.nyu.edu/courses/fall21/CSCI-GA.2250-002/nyush#outputredirection">Output redirection</a></li>
+<li><a href="https://cs.nyu.edu/courses/fall21/CSCI-GA.2250-002/nyush#pipe">Pipe</a></li>
+</ul>
+</li>
+<li><a href="https://cs.nyu.edu/courses/fall21/CSCI-GA.2250-002/nyush#builtincommands">Built-in commands</a>
+<ul>
+<li><a href="https://cs.nyu.edu/courses/fall21/CSCI-GA.2250-002/nyush#cddir"><code>cd [dir]</code></a></li>
+<li><a href="https://cs.nyu.edu/courses/fall21/CSCI-GA.2250-002/nyush#jobs"><code>jobs</code></a></li>
+<li><a href="https://cs.nyu.edu/courses/fall21/CSCI-GA.2250-002/nyush#fgindex"><code>fg [index]</code></a></li>
+<li><a href="https://cs.nyu.edu/courses/fall21/CSCI-GA.2250-002/nyush#exit"><code>exit</code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="https://cs.nyu.edu/courses/fall21/CSCI-GA.2250-002/nyush#compiling">Compiling</a></li>
+<li><a href="https://cs.nyu.edu/courses/fall21/CSCI-GA.2250-002/nyush#testing">Testing</a></li>
+<li><a href="https://cs.nyu.edu/courses/fall21/CSCI-GA.2250-002/nyush#submission">Submission</a></li>
+<li><a href="https://cs.nyu.edu/courses/fall21/CSCI-GA.2250-002/nyush#rubric">Rubric</a></li>
+<li><a href="https://cs.nyu.edu/courses/fall21/CSCI-GA.2250-002/nyush#tips">Tips</a>
+<ul>
+<li><a href="https://cs.nyu.edu/courses/fall21/CSCI-GA.2250-002/nyush#dontprocrastinate">Don’t procrastinate</a></li>
+<li><a href="https://cs.nyu.edu/courses/fall21/CSCI-GA.2250-002/nyush#stepbystep">Step by step</a></li>
+<li><a href="https://cs.nyu.edu/courses/fall21/CSCI-GA.2250-002/nyush#readmanpages">Read man pages</a></li>
+<li><a href="https://cs.nyu.edu/courses/fall21/CSCI-GA.2250-002/nyush#usefulsystemcalls">Useful system calls</a></li>
+<li><a href="https://cs.nyu.edu/courses/fall21/CSCI-GA.2250-002/nyush#parsingthecommandline">Parsing the command line</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-introduction" class="outline-2">
+<h2 id="introduction">Introduction</h2>
+<div class="outline-text-2" id="text-introduction">
+<p>
+The <b>shell</b> is the main command-line interface between a user and the operating system, and it is an essential part of the daily lives of computer scientists, software engineers, system administrators, and so on. It makes heavy use of many OS features. In this lab, you will build a simplified version of the Unix shell called the <b>New Yet Usable SHell</b>, or <code>nyush</code> for short.
+</p>
+</div>
+</div>
+
+<div id="outline-container-objectives" class="outline-2">
+<h2 id="objectives">Objectives</h2>
+<div class="outline-text-2" id="text-objectives">
+<p>
+Through this lab, you will:
+</p>
+
+<ul class="org-ul">
+<li>Familiarize yourself with the Linux programming environment and the shell, of course.</li>
+<li>Learn how to write an interactive command-line program.</li>
+<li>Learn how processes are created, destroyed, and managed.</li>
+<li>Learn how to handle signals and I/O redirection.</li>
+<li>Get a better understanding of the OS and system calls.</li>
+<li>Be a better C programmer and be better prepared for your future technical job interviews. In particular, the string parsing skill that you will practice in this lab frequently appears in interview questions.</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-overview" class="outline-2">
+<h2 id="overview">Overview</h2>
+<div class="outline-text-2" id="text-overview">
+<p>
+The shell is essentially a command-line interpreter. It works as follows:
+</p>
+
+<ol class="org-ol">
+<li>It prompts you to enter a command.</li>
+<li>It interprets the command you entered.
+<ul class="org-ul">
+<li>If you entered a <b>built-in command</b> (<i>e.g.</i>, <code>cd</code>), then the shell runs that command.</li>
+<li>If you entered an external <b>program</b> (<i>e.g.</i>, <code>/bin/ls</code>), or multiple programs connected through <b>pipes</b> (<i>e.g.</i>, <code>ls -l | less</code>), then the shell creates child processes, executes these programs, and waits for <b>all</b> these processes to either terminate or be suspended.</li>
+<li>If you entered something wrong, then the shell prints an error message.</li>
+</ul></li>
+<li>Rinse and repeat until you enter the built-in command <code>exit</code>, at which point it exits.</li>
+</ol>
+</div>
+</div>
+
+<div id="outline-container-specifications" class="outline-2">
+<h2 id="specifications">Specifications</h2>
+<div class="outline-text-2" id="text-specifications">
+</div>
+<div id="outline-container-theprompt" class="outline-3">
+<h3 id="theprompt">The prompt</h3>
+<div class="outline-text-3" id="text-theprompt">
+<p>
+The <b>prompt</b> is what the shell prints before waiting for you to enter a command. In this lab, you will use the following format (the final underscore represents your cursor; you should <b>not</b> print that underscore):
+</p>
+
+<div class="org-src-container">
+<pre class="src src-text">[nyush dir]$ _
+</pre>
+</div>
+
+<p>
+The <code>dir</code> is the <b>basename</b> of the <b>current working directory</b>. For example, if you are in <code>/home/abc123/os/lab2</code>, then the prompt should be:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-text">[nyush lab2]$ _
+</pre>
+</div>
+
+<p>
+Note that there is a space after the dollar sign.
+</p>
+</div>
+</div>
+
+<div id="outline-container-thecommand" class="outline-3">
+<h3 id="thecommand">The command</h3>
+<div class="outline-text-3" id="text-thecommand">
+<p>
+In each iteration, the user inputs a command terminated by the “enter” key (<i>i.e.</i>, newline). For simplicity, we have the following assumptions:
+</p>
+
+<ul class="org-ul">
+<li>Each command has no more than 1000 characters.</li>
+<li>Program arguments, if any, are separated by a single space.</li>
+<li>There is no space within the program name or any command-line argument.</li>
+<li>A command may contain multiple programs separated by the <b>pipe</b> (<code>|</code>) symbol.</li>
+<li>In each command, the <b>first</b> program may <b>redirect its input</b> using <code>&lt;</code>, and the <b>last</b> program may <b>redirect its output</b> using <code>&gt;</code> or <code>&gt;&gt;</code>. If there is only one program in the command, it may redirect both input and output.</li>
+<li>In each command, there may be at most one input redirection and one output redirection.</li>
+<li>Built-in commands (<i>e.g.</i>, <code>cd</code>) cannot be I/O redirected or piped.</li>
+</ul>
+
+<p>
+For your reference, here is the grammar for valid commands (don’t worry if you can’t understand it; just look at the examples below):
+</p>
+
+<div class="org-src-container">
+<pre class="src src-text">[command] := ""; or
+          := [cd] [arg]; or
+          := [exit]; or
+          := [fg] [arg]; or
+          := [jobs]; or
+          := [cmd] '&lt;' [filename] [recursive]; or
+          := [cmd] '&lt;' [filename] [terminate]; or
+          := [cmd] [recursive]; or
+          := [cmd] [terminate] &lt; [filename]; or
+          := [cmd] [terminate].
+
+[recursive] := '|' [cmd] [recursive]; or
+            := '|' [cmd] [terminate].
+
+[terminate] := ""; or
+            := '&gt;' [filename].
+            := '&gt;&gt;' [filename].
+
+[cmd] := [cmdname] [arg]*
+
+[cmdname] := A string without any space, tab, &gt; (ASCII 62), &lt; (ASCII 60), | (ASCII 124), * (ASCII 42), ! (ASCII 33), ` (ASCII 96), ' (ASCII 39), nor " (ASCII 34) characters. Besides, the cmdname is not cd, exit, fg, jobs.
+
+[arg] := A string without any space, tab, &gt; (ASCII 62), &lt; (ASCII 60), | (ASCII 124), * (ASCII 42), ! (ASCII 33), ` (ASCII 96), ' (ASCII 39), nor " (ASCII 34) characters.
+
+[filename] := A string without any space, tab, &gt; (ASCII 62), &lt; (ASCII 60), | (ASCII 124), * (ASCII 42), ! (ASCII 33), ` (ASCII 96), ' (ASCII 39), nor " (ASCII 34) characters.
+</pre>
+</div>
+
+<p>
+Here are some examples of <b><b>valid</b></b> commands:
+</p>
+
+<ul class="org-ul">
+<li>A blank line.</li>
+<li><code>ls -a -l</code></li>
+<li><code>cat shell.c | grep main | less</code></li>
+<li><code>cat &lt; input.txt &gt; output.txt</code></li>
+<li><code>cat &lt; input.txt &gt;&gt; output.txt</code></li>
+<li><code>cat &lt; input.txt | cat | cat &gt; output.txt</code></li>
+</ul>
+
+<p>
+Here are some examples of <b><b>invalid</b></b> commands:
+</p>
+
+<ul class="org-ul">
+<li><code>cat &lt;</code></li>
+<li><code>cat &gt;</code></li>
+<li><code>cat |</code></li>
+<li><code>| cat</code></li>
+<li><code>cat &lt;&lt; input.txt</code></li>
+<li><code>cat &lt; output.txt &lt; output2.txt</code></li>
+<li><code>cat &lt; output.txt output2.txt</code></li>
+<li><code>cat &gt; output.txt &gt; output2.txt</code></li>
+<li><code>cat &gt; output.txt output2.txt</code></li>
+<li><code>cat &gt; output.txt | cat</code></li>
+<li><code>cat | cat &lt; input.txt</code></li>
+<li><code>cd / &gt; output.txt</code></li>
+</ul>
+
+<p>
+If there is any error in parsing the command, then your shell should print the following error message to <code>STDERR</code> and prompt for the next command.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-text">Error: invalid command
+</pre>
+</div>
+
+<p>
+Note that there should be a newline at the end of the error message. For example:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-text">[nyush lab2]$ cat &lt;
+Error: invalid command
+[nyush lab2]$ _
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-locatingprograms" class="outline-3">
+<h3 id="locatingprograms">Locating programs</h3>
+<div class="outline-text-3" id="text-locatingprograms">
+<p>
+You can specify a program by either an <b>absolute path</b>, a <b>relative path</b>, or <b>base name only</b>.
+</p>
+
+<p>
+An <b>absolute path</b> begins with a slash (<code>/</code>). If the user specifies an absolute path, then your shell must run the program at that location.
+</p>
+
+<p>
+A <b>relative path</b> contains, but not begins with, a slash (<code>/</code>). If the user specifies a relative path, then your shell should locate the program by following the path from the current working directory. For example, <code>dir1/dir2/program</code> is equivalent to <code>./dir1/dir2/program</code>.
+</p>
+
+<p>
+Otherwise, if the user specifies <b>only the base name</b> without any slash (<code>/</code>), then your shell must search for the program under <code>/bin</code> and <code>/usr/bin</code> (in such order). For example, when the user types <code>ls</code>, then your shell should try <code>/bin/ls</code>. If that fails, try <code>/usr/bin/ls</code>. If that also fails, it is an error. In this case, your shell should <b>not</b> search the current working directory. If there is a program named <code>hello</code> in the current working directory. Entering <code>hello</code> should result in an error, whereas <code>./hello</code> runs the program.
+</p>
+
+<p>
+In any case, if the program cannot be located, your shell should print the following error message to <code>STDERR</code> and prompt for the next command.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-text">Error: invalid program
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-processterminationandsuspension" class="outline-3">
+<h3 id="processterminationandsuspension">Process termination and suspension</h3>
+<div class="outline-text-3" id="text-processterminationandsuspension">
+<p>
+After creating the processes, your shell must wait until <b>all</b> the processes have stopped running: either terminated or suspended. Then, your shell should prompt the user for the next command.
+</p>
+
+<p>
+<b>Your shell must not leave any zombies in the system</b> when it is ready to read the next command from the user.
+</p>
+</div>
+</div>
+
+<div id="outline-container-signalhandling" class="outline-3">
+<h3 id="signalhandling">Signal handling</h3>
+<div class="outline-text-3" id="text-signalhandling">
+<p>
+If a user presses <code>Ctrl-C</code> or <code>Ctrl-Z</code>, they don’t expect to terminate or suspend the shell. Therefore, your shell should <b>ignore</b> the following signals: <code>SIGINT</code>, <code>SIGQUIT</code>, <code>SIGTERM</code>, <code>SIGTSTP</code>. All other signals not listed here should keep the default signal handlers.
+</p>
+
+<p>
+Note that only the <b>shell</b> itself, not the child processes created by the shell, should ignore these signals. For example,
+</p>
+
+<div class="org-src-container">
+<pre class="src src-text">[nyush lab2]$ cat
+^C
+[nyush lab2]$ _
+</pre>
+</div>
+
+<p>
+Here, the signal <code>SIGINT</code> generated by <code>Ctrl-C</code> terminates only the process <code>cat</code>, not the shell itself.
+</p>
+
+<p>
+As a side note, if your shell ever hangs and you would like to kill the shell, you can still send it the <code>SIGKILL</code> signal.
+</p>
+</div>
+</div>
+
+<div id="outline-container-ioredirection" class="outline-3">
+<h3 id="ioredirection">I/O redirection</h3>
+<div class="outline-text-3" id="text-ioredirection">
+<p>
+Sometimes, a user would read the input to a program from a file rather than the keyboard, or send the output of a program to a file rather than the screen. Your shell should be able to redirect the <b>standard input</b> (<code>STDIN</code>) and the <b>standard output</b> (<code>STDOUT</code>). <i>For simplicity, you are not required to redirect the standard error (<code>STDERR</code>).</i>
+</p>
+</div>
+
+<div id="outline-container-inputredirection" class="outline-4">
+<h4 id="inputredirection">Input redirection</h4>
+<div class="outline-text-4" id="text-inputredirection">
+<p>
+Input redirection is achieved by a <code>&lt;</code> symbol followed by a file name. For example:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-text">[nyush lab2]$ cat &lt; input.txt
+</pre>
+</div>
+
+<p>
+If the file does not exist, your shell should print the following error message to <code>STDERR</code> and prompt for the next command.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-text">Error: invalid file
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-outputredirection" class="outline-4">
+<h4 id="outputredirection">Output redirection</h4>
+<div class="outline-text-4" id="text-outputredirection">
+<p>
+Output redirection is achieved by <code>&gt;</code> or <code>&gt;&gt;</code> followed by a file name. For example:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-text">[nyush lab2]$ ls -l &gt; output.txt
+[nyush lab2]$ ls -l &gt;&gt; output.txt
+</pre>
+</div>
+
+<p>
+If the file does not exist, a new file should be created. If the file already exists, redirecting with <code>&gt;</code> should <b>overwrite</b> the file (after truncating it), whereas redirecting with <code>&gt;&gt;</code> should <b>append</b> to the existing file.
+</p>
+</div>
+</div>
+
+<div id="outline-container-pipe" class="outline-4">
+<h4 id="pipe">Pipe</h4>
+<div class="outline-text-4" id="text-pipe">
+<p>
+A <b>pipe</b> (<code>|</code>) connects the standard output of the first program to the standard input of the second program. For example:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-text">[nyush lab2]$ cat shell.c | wc -l
+</pre>
+</div>
+
+<p>
+The user may invoke <i>n</i> programs chained through (<i>n</i> - 1) pipes. Each pipe connects the output of the program immediately before the pipe to the input of the program immediately after the pipe. For example:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-text">[nyush lab2]$ cat shell.c | grep main | less
+</pre>
+</div>
+
+<p>
+Here, the output of <code>cat shell.c</code> is the input of <code>grep main</code>, and the output of <code>grep main</code> is the input of <code>less</code>.
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-builtincommands" class="outline-3">
+<h3 id="builtincommands">Built-in commands</h3>
+<div class="outline-text-3" id="text-builtincommands">
+<p>
+Every shell has a few built-in commands. When the user issues a command, the shell should first check if it is a <b>built-in command</b>. If so, it should not be executed like other programs.
+</p>
+
+<p>
+In this lab, you will implement four built-in commands: <code>cd</code>, <code>jobs</code>, <code>fg</code>, and <code>exit</code>.
+</p>
+</div>
+
+<div id="outline-container-cddir" class="outline-4">
+<h4 id="cddir"><code>cd [dir]</code></h4>
+<div class="outline-text-4" id="text-cddir">
+<p>
+This command changes the <b>current working directory</b> of the shell. It takes exactly one argument: the directory, which may be an absolute or relative path.
+</p>
+
+<p>
+If <code>cd</code> is called with 0 or 2+ arguments, your shell should print the following error message to <code>STDERR</code> and prompt for the next command.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-text">Error: invalid command
+</pre>
+</div>
+
+<p>
+If the directory does not exist, your shell should print the following error message to <code>STDERR</code> and prompt for the next command.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-text">Error: invalid directory
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-jobs" class="outline-4">
+<h4 id="jobs"><code>jobs</code></h4>
+<div class="outline-text-4" id="text-jobs">
+<p>
+This command prints a list of currently <b>suspended</b> jobs to <code>STDOUT</code> in the following format: <code>[index] command</code>. For example:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-text">[nyush lab2]$ jobs
+[1] cat
+[2] top | cat
+[3] cat &gt; output.txt
+[nyush lab2]$ _
+</pre>
+</div>
+
+<p>
+A job is the whole command, which may be either one program or multiple programs connected through pipes. A job may be suspended by <code>Ctrl-Z</code>, the <code>SIGTSTP</code> signal, or the <code>SIGSTOP</code> signal. This list is sorted by the time each job is suspended (oldest first).
+</p>
+
+<p>
+<i>For simplicity, you can assume that there are no more than 100 suspended jobs at one time. Besides, you are not required to handle the case where a suspended job is resumed or terminated by other processes.</i>
+</p>
+
+<p>
+The <code>jobs</code> command takes no arguments. If it is called with any arguments, your shell should print the following error message to <code>STDERR</code> and prompt for the next command.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-text">Error: invalid command
+</pre>
+</div>
+</div>
+</div>
+
+
+<div id="outline-container-fgindex" class="outline-4">
+<h4 id="fgindex"><code>fg [index]</code></h4>
+<div class="outline-text-4" id="text-fgindex">
+<p>
+This command resumes a job in the foreground. It takes exactly one argument: the job index, which is the number in the bracket printed by the <code>jobs</code> command. For example:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-text">[nyush lab2]$ jobs
+[1] cat
+[2] top | cat
+[3] cat &gt; output.txt
+[nyush lab2]$ fg 2
+</pre>
+</div>
+
+<p>
+This command would resume <code>top | cat</code> in the foreground.
+</p>
+
+<p>
+If <code>fg</code> is called with 0 or 2+ arguments, your shell should print the following error message to <code>STDERR</code> and prompt for the next command.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-text">Error: invalid command
+</pre>
+</div>
+
+<p>
+If the job <code>index</code> does not exist in the list of currently suspended jobs, your shell should print the following error message to <code>STDERR</code> and prompt for the next command.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-text">Error: invalid job
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-exit" class="outline-4">
+<h4 id="exit"><code>exit</code></h4>
+<div class="outline-text-4" id="text-exit">
+<p>
+This command terminates your shell. However, if there are currently suspended jobs, your shell should not terminate. Instead, it should print the following error message to <code>STDERR</code> and prompt for the next command.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-text">Error: there are suspended jobs
+</pre>
+</div>
+
+<p>
+The <code>exit</code> command takes no arguments. If it is
+called with any arguments, your shell should print the following error message to <code>STDERR</code> and prompt for the next command.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-text">Error: invalid command
+</pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<div id="outline-container-compiling" class="outline-2">
+<h2 id="compiling">Compiling</h2>
+<div class="outline-text-2" id="text-compiling">
+<p>
+We will grade your submission on <a href="https://cims.nyu.edu/webapps/content/systems/resources/computeservers/">linserv1.cims.nyu.edu</a>, which runs CentOS Linux release 7.9.2009. We will compile your program using <code>gcc</code> 9.2.0. You need to run the following command to load it:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-text">$ module load gcc-9.2
+</pre>
+</div>
+
+<p>
+You must provide a <code>Makefile</code>, and by running <code>make</code>, it should generate an executable file named <code>nyush</code> in the current working directory.
+</p>
+
+<p>
+<b>Your program must not call the <code>system()</code> function.</b> Otherwise, what is the whole point of this lab?
+</p>
+</div>
+</div>
+
+<div id="outline-container-testing" class="outline-2">
+<h2 id="testing">Testing</h2>
+<div class="outline-text-2" id="text-testing">
+<p>
+Beat up your own code extensively. Better yet, <a href="https://en.wikipedia.org/wiki/Eating_your_own_dog_food">eat your own dog food</a>. I would happily use <code>nyush</code> as my main shell (at least for the duration of this lab), so why wouldn’t you?
+</p>
+
+<p>
+By popular demand, we are providing some <a href="https://cs.nyu.edu/courses/fall21/CSCI-GA.2250-002/nyush-grading.tar.gz">sample test cases</a>. Note that these cases are <b>not</b> exhaustive. The test cases for final grading will be different from the ones provided and will not be shared. Commands like <code>job</code> and <code>fg</code> are not tested extensively in these test cases, but they will be for the final grading.
+</p>
+</div>
+</div>
+
+<div id="outline-container-submission" class="outline-2">
+<h2 id="submission">Submission</h2>
+<div class="outline-text-2" id="text-submission">
+<p>
+You will submit an archive containing all files needed to compile <code>nyush</code>. You can do so with the following command:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-text">$ tar cvJf nyush-Your_NetID.tar.xz Makefile *.h *.c
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-rubric" class="outline-2">
+<h2 id="rubric">Rubric</h2>
+<div class="outline-text-2" id="text-rubric">
+<p>
+The total of this lab is 100 points, mapped to 15% of your final grade of this course.
+</p>
+
+<ul class="org-ul">
+<li>Compile successfully and can prompt the user for input. (40 points)</li>
+<li>Process creation and termination. (20 points)</li>
+<li>I/O redirection and pipe. (20 points)</li>
+<li>Handling suspended jobs (<code>jobs</code> and <code>fg</code>). (10 points)</li>
+<li>Built-in commands and error handling. (10 points)</li>
+</ul>
+
+<p>
+<b>You will get 0 points for this lab if you call the <code>system()</code> function.</b>
+</p>
+
+<p>
+Please make sure that your shell prompt and all error messages are as specified in this document. Any discrepancy may lead to point deductions.
+</p>
+</div>
+</div>
+
+<div id="outline-container-tips" class="outline-2">
+<h2 id="tips">Tips</h2>
+<div class="outline-text-2" id="text-tips">
+</div>
+<div id="outline-container-dontprocrastinate" class="outline-3">
+<h3 id="dontprocrastinate">Don’t procrastinate</h3>
+<div class="outline-text-3" id="text-dontprocrastinate">
+<p>
+This lab requires significant programming effort. Therefore, <b>start as early as possible!</b> Don’t wait until the last week.
+</p>
+</div>
+</div>
+
+<div id="outline-container-stepbystep" class="outline-3">
+<h3 id="stepbystep">Step by step</h3>
+<div class="outline-text-3" id="text-stepbystep">
+<p>
+Remember to get the <b>basic functionality</b> working first, and build up your shell step-by-step.
+</p>
+
+<p>
+Here is how I would tackle this lab:
+</p>
+
+<ol class="org-ol">
+<li>Write a simple command parser.</li>
+<li>Be able to run a simple program, such as <code>ls</code>.</li>
+<li>Run a program with arguments, such as <code>ls -l</code>.</li>
+<li>Handle simple built-in commands (<code>cd</code> and <code>exit</code>).</li>
+<li>Handle output redirection, such as <code>cat &gt; output.txt</code>.</li>
+<li>Handle input redirection, such as <code>cat &lt; input.txt</code>.</li>
+<li>Run two programs with one pipe, such as <code>cat | cat</code>.</li>
+<li>Handle multiple pipes, such as <code>cat | cat | cat</code>.</li>
+<li>Handle suspended jobs.</li>
+<li>Handle more built-in commands (<code>jobs</code> and <code>fg</code>).</li>
+</ol>
+
+<p>
+Feel free to rearrange as you see fit.
+</p>
+
+<p>
+<b>Keep versions of your code!</b> Use <code>git</code> or similar tools, but <b>don’t make your repository public</b>.
+</p>
+</div>
+</div>
+
+<div id="outline-container-readmanpages" class="outline-3">
+<h3 id="readmanpages">Read man pages</h3>
+<div class="outline-text-3" id="text-readmanpages">
+<p>
+Man pages are of vital importance for programmers working on Linux and such. They contain a trove of information.
+</p>
+
+<p>
+Man pages are divided into <b>sections</b>. Please see <code>man man</code> for the description of each section. In particular, Section 2 contains system calls. You will need to look them up a lot in this lab.
+</p>
+
+<p>
+Sometimes, you need to specify the section number explicitly. For example, <code>man pipe</code> shows the page in Section 8 by default. If you need to look up the <code>pipe()</code> system call, you need to invoke <code>man 2 pipe</code>.
+</p>
+</div>
+</div>
+
+<div id="outline-container-usefulsystemcalls" class="outline-3">
+<h3 id="usefulsystemcalls">Useful system calls</h3>
+<div class="outline-text-3" id="text-usefulsystemcalls">
+<p>
+Your shell will make many system calls. Here are a few that you may find useful.
+</p>
+
+<ul class="org-ul">
+<li>Process management: <code>fork()</code>, <code>exec*()</code>, <code>wait()</code>, <code>waitpid()</code>.</li>
+<li>I/O redirection and pipe: <code>dup2()</code>, <code>creat()</code>, <code>open()</code>, <code>close()</code>, <code>pipe()</code>.</li>
+<li>Signal handling: <code>signal()</code>.</li>
+<li>Built-in commands: <code>chdir()</code>, <code>getcwd()</code>, <code>kill()</code>.</li>
+</ul>
+
+<p>
+You may not need to use all of them, and you are free to use other system calls not mentioned above.
+</p>
+
+<p>
+Check the <b>return values</b> of all system calls from the very beginning of your work. This will often catch errors early, and it is a good programming practice.
+</p>
+</div>
+</div>
+
+<div id="outline-container-parsingthecommandline" class="outline-3">
+<h3 id="parsingthecommandline">Parsing the command line</h3>
+<div class="outline-text-3" id="text-parsingthecommandline">
+<p>
+You may find writing the command parser troublesome. Don’t be frustrated. You are not alone. However, it is an essential skill for any programmer, and it often appears in software engineer interviews. Once you get through it, you will never be afraid of it again.
+</p>
+
+<p>
+I personally find the <code>strtok_r()</code> function extremely helpful. You don’t have to use it, but why not give it a try?
+</p>
+
+<p>
+<i>This lab has borrowed some ideas from Prof. Arpaci-Dusseau and Dr. T. Y. Wong.</i>
+</p>
+</div>
+</div>
+</div>
+</div>
+
+
+</body></html>
